@@ -375,7 +375,159 @@ if uploaded_file is not None:
             height=450
         )
 
+                # =========================
+        # BN REPORT
         # =========================
+
+        if bn_col:
+
+            st.subheader("📊 BN Report")
+
+            if st.button("📊 Generate BN Report"):
+
+                report_df = filtered_df.copy()
+
+                # Total Records
+                bn_report = (
+                    report_df
+                    .groupby(bn_col)
+                    .size()
+                    .reset_index(name="Total Records")
+                )
+
+                # Pending & Completed
+                if status_col:
+
+                    temp_report = report_df.copy()
+
+                    temp_report["_status"] = (
+                        temp_report[status_col]
+                        .fillna("")
+                        .astype(str)
+                        .str.strip()
+                        .str.casefold()
+                    )
+
+                    pending_report = (
+                        temp_report[
+                            temp_report["_status"]
+                            .str.contains(
+                                "pending",
+                                na=False
+                            )
+                        ]
+                        .groupby(bn_col)
+                        .size()
+                        .rename("Pending")
+                    )
+
+                    completed_report = (
+                        temp_report[
+                            temp_report["_status"]
+                            .str.contains(
+                                "complete|completed|done",
+                                regex=True,
+                                na=False
+                            )
+                        ]
+                        .groupby(bn_col)
+                        .size()
+                        .rename("Completed")
+                    )
+
+                    bn_report = bn_report.merge(
+                        pending_report,
+                        on=bn_col,
+                        how="left"
+                    )
+
+                    bn_report = bn_report.merge(
+                        completed_report,
+                        on=bn_col,
+                        how="left"
+                    )
+
+                else:
+
+                    bn_report["Pending"] = 0
+                    bn_report["Completed"] = 0
+
+                # Fill blank values
+                bn_report["Pending"] = (
+                    bn_report["Pending"]
+                    .fillna(0)
+                    .astype(int)
+                )
+
+                bn_report["Completed"] = (
+                    bn_report["Completed"]
+                    .fillna(0)
+                    .astype(int)
+                )
+
+                # Contribution
+                if amount_col:
+
+                    contribution_report = (
+                        report_df
+                        .assign(
+                            _amount=pd.to_numeric(
+                                report_df[amount_col],
+                                errors="coerce"
+                            ).fillna(0)
+                        )
+                        .groupby(bn_col)["_amount"]
+                        .sum()
+                        .rename("Total Contribution")
+                    )
+
+                    bn_report = bn_report.merge(
+                        contribution_report,
+                        on=bn_col,
+                        how="left"
+                    )
+
+                    bn_report["Total Contribution"] = (
+                        bn_report["Total Contribution"]
+                        .fillna(0)
+                    )
+
+                else:
+
+                    bn_report["Total Contribution"] = 0
+
+                # Show Report
+                st.dataframe(
+                    bn_report,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # Excel Download
+                excel_output = pd.ExcelWriter(
+                    "BN_Report.xlsx",
+                    engine="openpyxl"
+                )
+
+                bn_report.to_excel(
+                    excel_output,
+                    index=False,
+                    sheet_name="BN Report"
+                )
+
+                excel_output.close()
+
+                with open(
+                    "BN_Report.xlsx",
+                    "rb"
+                ) as file:
+
+                    st.download_button(
+                        "⬇️ Download BN Report",
+                        data=file,
+                        file_name="BN_Report.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )# =========================
         # DOWNLOAD
         # =========================
 
