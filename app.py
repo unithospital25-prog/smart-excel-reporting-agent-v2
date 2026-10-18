@@ -23,6 +23,7 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
 
     try:
+
         excel_file = pd.ExcelFile(uploaded_file)
 
         st.success("✅ Excel file uploaded successfully!")
@@ -92,7 +93,13 @@ if uploaded_file is not None:
         bn_col = None
 
         for col in df.columns:
-            if col.lower() in ["bn", "battalion", "unit"]:
+
+            if col.lower() in [
+                "bn",
+                "battalion",
+                "unit"
+            ]:
+
                 bn_col = col
                 break
 
@@ -126,11 +133,13 @@ if uploaded_file is not None:
         status_col = None
 
         for col in df.columns:
+
             if col.lower() in [
                 "status",
                 "case status",
                 "case_status"
             ]:
+
                 status_col = col
                 break
 
@@ -204,11 +213,13 @@ if uploaded_file is not None:
         amount_col = None
 
         for col in df.columns:
+
             if col.lower() in [
                 "amount",
                 "contribution",
                 "total amount"
             ]:
+
                 amount_col = col
                 break
 
@@ -228,24 +239,28 @@ if uploaded_file is not None:
         c1, c2, c3, c4 = st.columns(4)
 
         with c1:
+
             st.metric(
                 "📋 Total Records",
                 total_records
             )
 
         with c2:
+
             st.metric(
                 "⏳ Pending",
                 pending_count
             )
 
         with c3:
+
             st.metric(
                 "✅ Completed",
                 completed_count
             )
 
         with c4:
+
             st.metric(
                 "💰 Contribution",
                 f"₹{total_amount:,.0f}"
@@ -342,7 +357,9 @@ if uploaded_file is not None:
 
         if status_col:
 
-            st.subheader("📌 Case Status Summary")
+            st.subheader(
+                "📌 Case Status Summary"
+            )
 
             status_summary = (
                 filtered_df[status_col]
@@ -367,7 +384,9 @@ if uploaded_file is not None:
         # DATA PREVIEW
         # =========================
 
-        st.subheader("📋 Data Preview")
+        st.subheader(
+            "📋 Data Preview"
+        )
 
         st.dataframe(
             filtered_df,
@@ -375,15 +394,19 @@ if uploaded_file is not None:
             height=450
         )
 
-                # =========================
+        # =========================
         # BN REPORT
         # =========================
 
         if bn_col:
 
-            st.subheader("📊 BN Report")
+            st.subheader(
+                "📊 BN Report"
+            )
 
-            if st.button("📊 Generate BN Report"):
+            if st.button(
+                "📊 Generate BN Report"
+            ):
 
                 report_df = filtered_df.copy()
 
@@ -392,10 +415,12 @@ if uploaded_file is not None:
                     report_df
                     .groupby(bn_col)
                     .size()
-                    .reset_index(name="Total Records")
+                    .reset_index(
+                        name="Total Records"
+                    )
                 )
 
-                # Pending & Completed
+                # Pending and Completed
                 if status_col:
 
                     temp_report = report_df.copy()
@@ -478,7 +503,9 @@ if uploaded_file is not None:
                         )
                         .groupby(bn_col)["_amount"]
                         .sum()
-                        .rename("Total Contribution")
+                        .rename(
+                            "Total Contribution"
+                        )
                     )
 
                     bn_report = bn_report.merge(
@@ -487,16 +514,22 @@ if uploaded_file is not None:
                         how="left"
                     )
 
-                    bn_report["Total Contribution"] = (
-                        bn_report["Total Contribution"]
+                    bn_report[
+                        "Total Contribution"
+                    ] = (
+                        bn_report[
+                            "Total Contribution"
+                        ]
                         .fillna(0)
                     )
 
                 else:
 
-                    bn_report["Total Contribution"] = 0
+                    bn_report[
+                        "Total Contribution"
+                    ] = 0
 
-                # Show Report
+                # Show BN Report
                 st.dataframe(
                     bn_report,
                     use_container_width=True,
@@ -527,46 +560,59 @@ if uploaded_file is not None:
                         data=file,
                         file_name="BN_Report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )# =========================
-# EMPLOYEE-WISE REPORT
-# =========================
+                    )
 
-st.subheader("👤 Employee-wise Report")
-
-employee_report = filtered_df.copy()
-
-if len(employee_report) > 0:
-
-    st.write(
-        f"👥 Total Employees: **{len(employee_report)}**"
-    )
-
-    st.dataframe(
-        employee_report,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    employee_csv = employee_report.to_csv(
-        index=False
-    ).encode("utf-8")
-
-    st.download_button(
-        "⬇️ Download Employee Report",
-        data=employee_csv,
-        file_name="Employee_Wise_Report.csv",
-        mime="text/csv"
-    )
-
-else:
-
-    st.info("ℹ️ No employee records found.")# =========================
-        # DOWNLOAD
+        # =========================
+        # EMPLOYEE-WISE REPORT
         # =========================
 
-        csv_data = filtered_df.to_csv(
-            index=False
-        ).encode("utf-8")
+        st.subheader(
+            "👤 Employee-wise Report"
+        )
+
+        employee_report = filtered_df.copy()
+
+        if len(employee_report) > 0:
+
+            st.write(
+                f"👥 Total Employees: "
+                f"**{len(employee_report)}**"
+            )
+
+            st.dataframe(
+                employee_report,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            employee_csv = (
+                employee_report
+                .to_csv(index=False)
+                .encode("utf-8")
+            )
+
+            st.download_button(
+                "⬇️ Download Employee Report",
+                data=employee_csv,
+                file_name="Employee_Wise_Report.csv",
+                mime="text/csv"
+            )
+
+        else:
+
+            st.info(
+                "ℹ️ No employee records found."
+            )
+
+        # =========================
+        # DOWNLOAD FILTERED REPORT
+        # =========================
+
+        csv_data = (
+            filtered_df
+            .to_csv(index=False)
+            .encode("utf-8")
+        )
 
         st.download_button(
             "⬇️ Download Filtered Report",
