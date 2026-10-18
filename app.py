@@ -54,32 +54,42 @@ if uploaded_file is not None:
         )
 
         # ==============================
-        # SEARCH
-        # ==============================
+# SMART SEARCH
+# ==============================
 
-        st.subheader("🔎 Search & Filter")
+st.subheader("🔎 Search & Filter")
 
-        search_text = st.text_input(
-            "🔍 Search anything"
+search_text = st.text_input(
+    "🔍 Search UIN, Employee Name, BN, PRAN, Mobile, Status etc."
+)
+
+filtered_df = df.copy()
+
+if search_text and search_text.strip():
+
+    search_value = search_text.strip().casefold()
+
+    search_data = (
+        filtered_df
+        .fillna("")
+        .astype(str)
+    )
+
+    mask = search_data.apply(
+        lambda column:
+        column.str.casefold()
+        .str.contains(
+            re.escape(search_value),
+            regex=True,
+            na=False
         )
+    ).any(axis=1)
 
-        filtered_df = df.copy()
+    filtered_df = filtered_df.loc[mask].copy()
 
-        if search_text:
-
-            mask = filtered_df.astype(str).apply(
-                lambda row:
-                row.str.contains(
-                    search_text,
-                    case=False,
-                    na=False
-                ).any(),
-                axis=1
-            )
-
-            filtered_df = filtered_df[mask]
-
-        # ==============================
+    st.info(
+        f"🔍 Search result: {len(filtered_df)} record(s) found"
+    ) ==============================
         # COLUMN FILTER
         # ==============================
 
