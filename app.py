@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 
+# ==============================
+# PAGE SETTINGS
+# ==============================
+
 st.set_page_config(
     page_title="Smart Excel Reporting Agent",
     page_icon="📊",
@@ -10,9 +14,10 @@ st.set_page_config(
 st.title("📊 Smart Excel Reporting Agent")
 st.write("Upload, filter and analyze your Excel data.")
 
-# -----------------------------
-# Excel Upload
-# -----------------------------
+# ==============================
+# EXCEL UPLOAD
+# ==============================
+
 uploaded_file = st.file_uploader(
     "📂 Upload Excel File",
     type=["xlsx", "xls"]
@@ -21,13 +26,15 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
 
     try:
+
         excel_file = pd.ExcelFile(uploaded_file)
 
         st.success("✅ Excel file uploaded successfully!")
 
-        # -----------------------------
-        # Sheet Selection
-        # -----------------------------
+        # ==============================
+        # SHEET SELECTION
+        # ==============================
+
         sheet_name = st.selectbox(
             "📄 Select Sheet",
             excel_file.sheet_names
@@ -38,11 +45,17 @@ if uploaded_file is not None:
             sheet_name=sheet_name
         )
 
-        df.columns = df.columns.astype(str).str.strip()
+        # Clean column names
+        df.columns = (
+            df.columns
+            .astype(str)
+            .str.strip()
+        )
 
-        # -----------------------------
-        # Search
-        # -----------------------------
+        # ==============================
+        # SEARCH
+        # ==============================
+
         st.subheader("🔎 Search & Filter")
 
         search_text = st.text_input(
@@ -54,7 +67,8 @@ if uploaded_file is not None:
         if search_text:
 
             mask = filtered_df.astype(str).apply(
-                lambda row: row.str.contains(
+                lambda row:
+                row.str.contains(
                     search_text,
                     case=False,
                     na=False
@@ -64,9 +78,10 @@ if uploaded_file is not None:
 
             filtered_df = filtered_df[mask]
 
-        # -----------------------------
-        # Column Filter
-        # -----------------------------
+        # ==============================
+        # COLUMN FILTER
+        # ==============================
+
         filter_column = st.selectbox(
             "📌 Filter by Column",
             ["No Filter"] + list(df.columns)
@@ -95,118 +110,203 @@ if uploaded_file is not None:
                     == selected_value
                 ]
 
-        # =====================================================
+        # ==============================
+        # COLUMN DETECTION
+        # ==============================
+
+        bn_col = None
+        name_col = None
+        status_col = None
+        amount_col = None
+
+        # Battalion
+        for col in df.columns:
+            if col.lower() in [
+                "bn",
+                "battalion",
+                "unit"
+            ]:
+                bn_col = col
+                break
+
+        # Name
+        for col in df.columns:
+            if col.lower() in [
+                "name",
+                "employee name",
+                "employee_name"
+            ]:
+                name_col = col
+                break
+
+        # Status
+        for col in df.columns:
+            if col.lower() in [
+                "status",
+                "case status",
+                "case_status"
+            ]:
+                status_col = col
+                break
+
+        # Amount / Contribution
+        for col in df.columns:
+            if col.lower() in [
+                "amount",
+                "contribution",
+                "total amount"
+            ]:
+                amount_col = col
+                break
+
+        # ==============================
         # DASHBOARD
-        # =====================================================
+        # ==============================
 
         st.subheader("📊 Automatic Dashboard")
 
         total_records = len(filtered_df)
 
+        # Amount
         total_amount = 0
-        if "Amount" in filtered_df.columns:
+
+        if amount_col:
+
             total_amount = pd.to_numeric(
-                filtered_df["Amount"],
+                filtered_df[amount_col],
                 errors="coerce"
             ).fillna(0).sum()
 
+        # Status
         pending_count = 0
         completed_count = 0
 
-        if "Status" in filtered_df.columns:
+        if status_col:
 
-            status_data = (
-                filtered_df["Status"]
+            status_values = (
+                filtered_df[status_col]
                 .astype(str)
                 .str.strip()
                 .str.lower()
             )
 
-            pending_count = (status_data == "pending").sum()
-            completed_count = (status_data == "completed").sum()
+            pending_count = (
+                status_values
+                .str.contains(
+                    "pending",
+                    na=False
+                )
+                .sum()
+            )
 
-        # -----------------------------
-        # KPI Cards
-        # -----------------------------
+            completed_count = (
+                status_values
+                .str.contains(
+                    "complete|completed|done",
+                    regex=True,
+                    na=False
+                )
+                .sum()
+            )
 
-        col1, col2, col3, col4 = st.columns(4)
+        # ==============================
+        # KPI CARDS
+        # ==============================
 
-        with col1:
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
             st.metric(
                 "📋 Total Records",
                 total_records
             )
 
-        with col2:
+        with c2:
             st.metric(
                 "⏳ Pending",
                 pending_count
             )
 
-        with col3:
+        with c3:
             st.metric(
                 "✅ Completed",
                 completed_count
             )
 
-        with col4:
+        with c4:
             st.metric(
-                "💰 Total Amount",
+                "💰 Contribution",
                 f"₹{total_amount:,.0f}"
             )
 
-        # =====================================================
+        # ==============================
         # BN-WISE SUMMARY
-        # =====================================================
+        # ==============================
 
-        if "BN" in filtered_df.columns:
+        if bn_col:
 
-            st.subheader("🏢 BN-wise Summary")
+            st.subheader("🏢 Battalion-wise Summary")
 
             bn_summary = (
                 filtered_df
-                .groupby("BN", dropna=False)
-                .agg(
-                    Total_Records=("BN", "size")
+                .groupby(
+                    bn_col,
+                    dropna=False
                 )
-                .reset_index()
+                .size()
+                .reset_index(
+                    name="Total Records"
+                )
             )
 
-            if "Status" in filtered_df.columns:
+            # Status counts
+            if status_col:
 
-                pending_bn = (
-                    filtered_df[
-                        filtered_df["Status"]
-                        .astype(str)
-                        .str.lower()
-                        .eq("pending")
+                temp = filtered_df.copy()
+
+                temp["_status"] = (
+                    temp[status_col]
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                )
+
+                pending = (
+                    temp[
+                        temp["_status"]
+                        .str.contains(
+                            "pending",
+                            na=False
+                        )
                     ]
-                    .groupby("BN")
+                    .groupby(bn_col)
                     .size()
                     .rename("Pending")
                 )
 
-                completed_bn = (
-                    filtered_df[
-                        filtered_df["Status"]
-                        .astype(str)
-                        .str.lower()
-                        .eq("completed")
+                completed = (
+                    temp[
+                        temp["_status"]
+                        .str.contains(
+                            "complete|completed|done",
+                            regex=True,
+                            na=False
+                        )
                     ]
-                    .groupby("BN")
+                    .groupby(bn_col)
                     .size()
                     .rename("Completed")
                 )
 
                 bn_summary = bn_summary.merge(
-                    pending_bn,
-                    on="BN",
+                    pending,
+                    on=bn_col,
                     how="left"
                 )
 
                 bn_summary = bn_summary.merge(
-                    completed_bn,
-                    on="BN",
+                    completed,
+                    on=bn_col,
                     how="left"
                 )
 
@@ -222,24 +322,25 @@ if uploaded_file is not None:
                     .astype(int)
                 )
 
-            if "Amount" in filtered_df.columns:
+            # Contribution
+            if amount_col:
 
-                amount_summary = (
+                contribution = (
                     filtered_df
                     .assign(
-                        Amount=pd.to_numeric(
-                            filtered_df["Amount"],
+                        _amount=pd.to_numeric(
+                            filtered_df[amount_col],
                             errors="coerce"
                         ).fillna(0)
                     )
-                    .groupby("BN")["Amount"]
+                    .groupby(bn_col)["_amount"]
                     .sum()
-                    .rename("Total Amount")
+                    .rename("Contribution")
                 )
 
                 bn_summary = bn_summary.merge(
-                    amount_summary,
-                    on="BN",
+                    contribution,
+                    on=bn_col,
                     how="left"
                 )
 
@@ -249,16 +350,16 @@ if uploaded_file is not None:
                 hide_index=True
             )
 
-        # =====================================================
-        # STATUS SUMMARY
-        # =====================================================
+        # ==============================
+        # CASE STATUS SUMMARY
+        # ==============================
 
-        if "Status" in filtered_df.columns:
+        if status_col:
 
-            st.subheader("📌 Status-wise Summary")
+            st.subheader("📌 Case Status Summary")
 
             status_summary = (
-                filtered_df["Status"]
+                filtered_df[status_col]
                 .astype(str)
                 .str.strip()
                 .value_counts()
@@ -266,8 +367,8 @@ if uploaded_file is not None:
             )
 
             status_summary.columns = [
-                "Status",
-                "Count"
+                "Case Status",
+                "Total"
             ]
 
             st.dataframe(
@@ -276,18 +377,66 @@ if uploaded_file is not None:
                 hide_index=True
             )
 
-        # =====================================================
-        # EMPLOYEE-WISE SUMMARY
-        # =====================================================
+        # ==============================
+        # NOMINEE SUMMARY
+        # ==============================
 
-        if "Employee Name" in filtered_df.columns:
+        nominee_col = None
+
+        for col in df.columns:
+            if col.lower() in [
+                "nominee",
+                "nomination status"
+            ]:
+                nominee_col = col
+                break
+
+        if nominee_col:
+
+            st.subheader("👨‍👩‍👧 Nominee Summary")
+
+            nominee_summary = (
+                filtered_df[nominee_col]
+                .astype(str)
+                .str.strip()
+                .replace(
+                    "",
+                    "Blank"
+                )
+                .value_counts()
+                .reset_index()
+            )
+
+            nominee_summary.columns = [
+                "Nominee",
+                "Total"
+            ]
+
+            st.dataframe(
+                nominee_summary,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        # ==============================
+        # EMPLOYEE SUMMARY
+        # ==============================
+
+        if name_col and bn_col:
 
             st.subheader("👤 Employee-wise Summary")
 
             employee_summary = (
-                filtered_df
+                filtered_df[
+                    [name_col, bn_col]
+                ]
+                .copy()
+            )
+
+            employee_summary = (
+                employee_summary
                 .groupby(
-                    ["Employee Name", "BN"],
+                    [bn_col, name_col],
                     dropna=False
                 )
                 .size()
@@ -302,9 +451,9 @@ if uploaded_file is not None:
                 hide_index=True
             )
 
-        # =====================================================
+        # ==============================
         # DATA PREVIEW
-        # =====================================================
+        # ==============================
 
         st.subheader("📋 Data Preview")
 
@@ -314,9 +463,9 @@ if uploaded_file is not None:
             height=450
         )
 
-        # =====================================================
+        # ==============================
         # DOWNLOAD
-        # =====================================================
+        # ==============================
 
         csv_data = filtered_df.to_csv(
             index=False
