@@ -528,6 +528,39 @@ if uploaded_file is not None:
                         file_name="BN_Report.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )# =========================
+# EMPLOYEE-WISE REPORT
+# =========================
+
+st.subheader("👤 Employee-wise Report")
+
+employee_report = filtered_df.copy()
+
+if len(employee_report) > 0:
+
+    st.write(
+        f"👥 Total Employees: **{len(employee_report)}**"
+    )
+
+    st.dataframe(
+        employee_report,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    employee_csv = employee_report.to_csv(
+        index=False
+    ).encode("utf-8")
+
+    st.download_button(
+        "⬇️ Download Employee Report",
+        data=employee_csv,
+        file_name="Employee_Wise_Report.csv",
+        mime="text/csv"
+    )
+
+else:
+
+    st.info("ℹ️ No employee records found.")# =========================
         # DOWNLOAD
         # =========================
 
