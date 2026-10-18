@@ -477,7 +477,6 @@ if uploaded_file is not None:
                     bn_report["Pending"] = 0
                     bn_report["Completed"] = 0
 
-                # Fill blank values
                 bn_report["Pending"] = (
                     bn_report["Pending"]
                     .fillna(0)
@@ -529,26 +528,28 @@ if uploaded_file is not None:
                         "Total Contribution"
                     ] = 0
 
-                # Show BN Report
                 st.dataframe(
                     bn_report,
                     use_container_width=True,
                     hide_index=True
                 )
 
-                # Excel Download
-                excel_output = pd.ExcelWriter(
+                # =========================
+                # BN EXCEL DOWNLOAD
+                # =========================
+
+                bn_excel = pd.ExcelWriter(
                     "BN_Report.xlsx",
                     engine="openpyxl"
                 )
 
                 bn_report.to_excel(
-                    excel_output,
+                    bn_excel,
                     index=False,
                     sheet_name="BN Report"
                 )
 
-                excel_output.close()
+                bn_excel.close()
 
                 with open(
                     "BN_Report.xlsx",
@@ -585,44 +586,27 @@ if uploaded_file is not None:
                 hide_index=True
             )
 
-            employee_csv = (
-                employee_report
-                .to_csv(index=False)
-                .encode("utf-8")
+            # =========================
+            # EMPLOYEE EXCEL REPORT
+            # =========================
+
+            employee_excel = pd.ExcelWriter(
+                "Employee_Wise_Report.xlsx",
+                engine="openpyxl"
             )
 
-            st.download_button(
-                "⬇️ Download Employee Report",
-                data=employee_csv,
-                file_name="Employee_Wise_Report.csv",
-                mime="text/csv"
+            employee_report.to_excel(
+                employee_excel,
+                index=False,
+                sheet_name="Employee Report"
             )
 
-        else:
+            employee_excel.close()
 
-            st.info(
-                "ℹ️ No employee records found."
-            )
+            with open(
+                "Employee_Wise_Report.xlsx",
+                "rb"
+            ) as file:
 
-        # =========================
-        # DOWNLOAD FILTERED REPORT
-        # =========================
-
-        csv_data = (
-            filtered_df
-            .to_csv(index=False)
-            .encode("utf-8")
-        )
-
-        st.download_button(
-            "⬇️ Download Filtered Report",
-            data=csv_data,
-            file_name="filtered_report.csv",
-            mime="text/csv"
-        )
-
-    except Exception as e:
-
-        st.error(
-            f"❌ Error: {e}"
-        )
+                st.download_button(
+                    "⬇️
