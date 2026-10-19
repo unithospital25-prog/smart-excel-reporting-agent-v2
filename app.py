@@ -678,6 +678,239 @@ if uploaded_file is not None:
             else:
                 st.success("✅ All employees have nomination.")
 
+        # =====================================================
+        # COMPLETE MASTER REPORT
+        # =====================================================
+
+        st.subheader("📦 Complete Master Report")
+        st.write(
+            "एक button से सभी महत्वपूर्ण reports एक ही Excel file में तैयार करें।"
+        )
+
+        if st.button("📦 Generate Complete Master Report", key="generate_master_report"):
+
+            master_output = BytesIO()
+
+            with pd.ExcelWriter(master_output, engine="openpyxl") as writer:
+
+                # -------------------------
+                # 1. Summary Sheet
+                # -------------------------
+                summary_data = pd.DataFrame({
+                    "Particular": [
+                        "Total Records",
+                        "Pending",
+                        "Completed",
+                        "Total Contribution",
+                        "Unique Employees",
+                        "Missing PRAN",
+                        "Missing Nomination",
+                        "Duplicate UIN Records"
+                    ],
+                    "Value": [
+                        total_records,
+                        pending_count,
+                        completed_count,
+                        total_amount,
+                        unique_employee_count,
+                        len(missing_pran_report) if pran_col else 0,
+                        len(missing_nomination_report) if nomination_col else 0,
+                        len(duplicate_uin_report) if uin_col else 0
+                    ]
+                })
+                summary_data.to_excel(
+                    writer,
+                    index=False,
+                    sheet_name="Summary"
+                )
+
+                # -------------------------
+                # 2. BN Summary
+                # -------------------------
+                if bn_col:
+                    bn_master = filtered_df.groupby(bn_col).size().reset_index(
+                        name="Total Records"
+                    )
+
+                    if status_col:
+                        master_temp = filtered_df.copy()
+                        master_temp["_status"] = (
+                            master_temp[status_col]
+                            .fillna("")
+                            .astype(str)
+                            .str.strip()
+                            .str.casefold()
+                        )
+
+                        master_pending = (
+                            master_temp[
+                                master_temp["_status"].str.contains(
+                                    "pending",
+                                    regex=False,
+                                    na=False
+                                )
+                            ]
+                            .groupby(bn_col)
+                            .size()
+                            .rename("Pending")
+                        )
+
+                        master_completed = (
+                            master_temp[
+                                master_temp["_status"].str.contains(
+                                    "complete|completed|done",
+                                    regex=True,
+                                    na=False
+                                )
+                            ]
+                            .groupby(bn_col)
+                            .size()
+                            .rename("Completed")
+                        )
+
+                        bn_master = bn_master.merge(
+                            master_pending,
+                            on=bn_col,
+                            how="left"
+                        ).merge(
+                            master_completed,
+                            on=bn_col,
+                            how="left"
+                        )
+                    else:
+                        bn_master["Pending"] = 0
+                        bn_master["Completed"] = 0
+
+                    bn_master["Pending"] = bn_master["Pending"].fillna(0).astype(int)
+                    bn_master["Completed"] = bn_master["Completed"].fillna(0).astype(int)
+
+                    if amount_col:
+                        bn_amount_master = (
+                            filtered_df.assign(
+                                _amount=pd.to_numeric(
+                                    filtered_df[amount_col],
+                                    errors="coerce"
+                                ).fillna(0)
+                            )
+                            .groupby(bn_col)["_amount"]
+                            .sum()
+                            .rename("Total Contribution")
+                        )
+
+                        bn_master = bn_master.merge(
+                            bn_amount_master,
+                            on=bn_col,
+                            how="left"
+                        )
+                    else:
+                        bn_master["Total Contribution"] = 0
+
+                    bn_master["Total Contribution"] = (
+                        bn_master["Total Contribution"].fillna(0)
+                    )
+
+                    bn_master.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="BN Summary"
+                    )
+
+                # -------------------------
+                # 3. Employee Report
+                # -------------------------
+                employee_report.to_excel(
+                    writer,
+                    index=False,
+                    sheet_name="Employee Report"
+                )
+
+                # -------------------------
+                # 4. Missing PRAN
+                # -------------------------
+                if pran_col:
+                    missing_pran_report.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Missing PRAN"
+                    )
+                else:
+                    pd.DataFrame({"Message": ["PRAN column not found"]}).to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Missing PRAN"
+                    )
+
+                # -------------------------
+                # 5. Missing Nomination
+                # -------------------------
+                if nomination_col:
+                    missing_nomination_report.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Missing Nomination"
+                    )
+                else:
+                    pd.DataFrame({"Message": ["Nomination column not found"]}).to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Missing Nomination"
+                    )
+
+                # -------------------------
+                # 6. Duplicate UIN
+                # -------------------------
+                if uin_col:
+                    duplicate_uin_report.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Duplicate UIN"
+                    )
+                else:
+                    pd.DataFrame({"Message": ["UIN column not found"]}).to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Duplicate UIN"
+                    )
+
+                # -------------------------
+                # 7. Case Status
+                # -------------------------
+                if status_col:
+                    status_summary.to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Case Status"
+                    )
+                else:
+                    pd.DataFrame({"Message": ["Status column not found"]}).to_excel(
+                        writer,
+                        index=False,
+                        sheet_name="Case Status"
+                    )
+
+                # -------------------------
+                # 8. Filtered Data
+                # -------------------------
+                filtered_df.to_excel(
+                    writer,
+                    index=False,
+                    sheet_name="Filtered Data"
+                )
+
+            master_output.seek(0)
+
+            st.success(
+                "✅ Complete Master Report तैयार है — सभी reports एक Excel file में हैं।"
+            )
+
+            st.download_button(
+                "⬇️ Download Complete Master Report",
+                data=master_output.getvalue(),
+                file_name="Complete_Master_Report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_complete_master_report"
+            )
+
         # Data preview
         st.subheader("📋 Data Preview")
 
