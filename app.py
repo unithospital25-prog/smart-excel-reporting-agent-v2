@@ -191,6 +191,66 @@ def format_excel_writer(writer, dataframe, sheet_name):
         pass
 
 
+def normalize_column_key(value):
+    """Create a stable key for matching Excel headings across files."""
+    text = str(value).replace("\n", " ").replace("\r", " ")
+    text = re.sub(r"\s+", " ", text).strip().casefold()
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return text
+
+
+def normalize_columns(columns):
+    """Normalize headings and merge duplicate headings safely.
+
+    Example: UIN, Uin, UIN  and U-I-N become the same logical heading.
+    Original readable headings are retained where possible.
+    """
+    result = []
+    used = {}
+
+    preferred_names = {
+        "uin": "UIN",
+        "employee_name": "Employee Name",
+        "name": "Name",
+        "bn": "BN",
+        "battalion": "Battalion",
+        "unit": "Unit",
+        "pran": "PRAN",
+        "pran_no": "PRAN No",
+        "pran_number": "PRAN Number",
+        "status": "Status",
+        "case_status": "Case Status",
+        "amount": "Amount",
+        "contribution": "Contribution",
+        "total_amount": "Total Amount",
+        "nomination": "Nomination",
+        "nomination_status": "Nomination Status",
+        "nominee": "Nominee",
+        "nominee_status": "Nominee Status",
+        "mobile": "Mobile",
+        "mobile_no": "Mobile No"
+    }
+
+    for original in columns:
+        original_text = str(original).strip()
+        key = normalize_column_key(original_text)
+        base_name = preferred_names.get(key, original_text)
+
+        if base_name == "":
+            base_name = "Unnamed Column"
+
+        if base_name in used:
+            used[base_name] += 1
+            final_name = f"{base_name}_{used[base_name]}"
+        else:
+            used[base_name] = 1
+            final_name = base_name
+
+        result.append(final_name)
+
+    return result
+
+
 def find_column(columns, possible_names):
     normalized = {
         str(x).strip().casefold(): x
@@ -384,11 +444,26 @@ for uploaded_file in uploaded_files:
             if temp_df.empty:
                 continue
 
-            temp_df.columns = (
-                temp_df.columns
-                .astype(str)
-                .str.strip()
-            )
+            # Clean and normalize column headings before combining files.
+            # This makes headings such as "UIN", "Uin", "UIN ", etc.
+            # behave as the same column across different Excel files.
+            temp_df.columns = normalize_columns(temp_df.columns)
+
+            # Remove completely blank rows. This prevents empty Excel rows
+            # from appearing as None records in the combined master data.
+            if len(temp_df.columns) > 0:
+                blank_row_mask = temp_df.apply(
+                    lambda row: row.astype(str)
+                    .str.strip()
+                    .replace({"nan": "", "None": ""})
+                    .eq("")
+                    .all(),
+                    axis=1
+                )
+                temp_df = temp_df.loc[~blank_row_mask].copy()
+
+            if temp_df.empty:
+                continue
 
             # Keep source information for audit/tracking
             temp_df["Source File"] = uploaded_file.name
@@ -418,11 +493,26 @@ df = pd.concat(
     sort=False
 )
 
-df.columns = (
-    df.columns
-    .astype(str)
-    .str.strip()
-)
+df.columns = normalize_columns(df.columns)
+
+# Remove any rows that are completely blank after the final merge.
+# Source File and Source Sheet are ignored for this check because they
+# are intentionally populated for every valid record.
+data_columns = [
+    col for col in df.columns
+    if col not in ["Source File", "Source Sheet"]
+]
+
+if data_columns:
+    final_blank_mask = df[data_columns].apply(
+        lambda row: row.astype(str)
+        .str.strip()
+        .replace({"nan": "", "None": ""})
+        .eq("")
+        .all(),
+        axis=1
+    )
+    df = df.loc[~final_blank_mask].reset_index(drop=True)
 
 st.success(
     f"All uploaded files were combined successfully. "
