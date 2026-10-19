@@ -4,7 +4,7 @@ import re
 from io import BytesIO
 
 # =========================================================
-# PAGE SETTINGS
+# PAGE CONFIGURATION
 # =========================================================
 
 st.set_page_config(
@@ -16,12 +16,11 @@ st.set_page_config(
 st.title("📊 Smart Excel Reporting Agent")
 st.write("Upload and analyze your Excel data.")
 
-
 # =========================================================
-# EXCEL CREATION FUNCTION
+# HELPER FUNCTION - EXCEL DOWNLOAD
 # =========================================================
 
-def create_excel(dataframe, sheet_name="Report"):
+def create_excel_download(dataframe, sheet_name="Report"):
 
     output = BytesIO()
 
@@ -42,20 +41,6 @@ def create_excel(dataframe, sheet_name="Report"):
 
 
 # =========================================================
-# FIND COLUMN FUNCTION
-# =========================================================
-
-def find_column(columns, possible_names):
-
-    for col in columns:
-
-        if str(col).strip().lower() in possible_names:
-            return col
-
-    return None
-
-
-# =========================================================
 # UPLOAD EXCEL
 # =========================================================
 
@@ -63,7 +48,6 @@ uploaded_file = st.file_uploader(
     "📂 Upload Excel File",
     type=["xlsx", "xls"]
 )
-
 
 if uploaded_file is not None:
 
@@ -73,14 +57,9 @@ if uploaded_file is not None:
         # READ EXCEL
         # =================================================
 
-        excel_file = pd.ExcelFile(
-            uploaded_file
-        )
+        excel_file = pd.ExcelFile(uploaded_file)
 
-        st.success(
-            "✅ Excel file uploaded successfully!"
-        )
-
+        st.success("✅ Excel file uploaded successfully!")
 
         # =================================================
         # SELECT SHEET
@@ -91,16 +70,12 @@ if uploaded_file is not None:
             excel_file.sheet_names
         )
 
-
         df = pd.read_excel(
             uploaded_file,
             sheet_name=sheet_name
         )
 
-
-        # =================================================
-        # CLEAN COLUMN NAMES
-        # =================================================
+        # Clean column names
 
         df.columns = (
             df.columns
@@ -108,122 +83,25 @@ if uploaded_file is not None:
             .str.strip()
         )
 
-
-        # =================================================
-        # FIND IMPORTANT COLUMNS
-        # =================================================
-
-        bn_col = find_column(
-            df.columns,
-            {
-                "bn",
-                "battalion",
-                "unit"
-            }
-        )
-
-
-        status_col = find_column(
-            df.columns,
-            {
-                "status",
-                "case status",
-                "case_status"
-            }
-        )
-
-
-        amount_col = find_column(
-            df.columns,
-            {
-                "amount",
-                "contribution",
-                "total amount"
-            }
-        )
-
-
-        uin_col = find_column(
-            df.columns,
-            {
-                "uin",
-                "uin no",
-                "uin number",
-                "employee number",
-                "employee no",
-                "employee id"
-            }
-        )
-
-
-        name_col = find_column(
-            df.columns,
-            {
-                "name",
-                "employee name",
-                "employee_name"
-            }
-        )
-
-
-        pran_col = find_column(
-            df.columns,
-            {
-                "pran",
-                "pran no",
-                "pran number",
-                "pran no."
-            }
-        )
-
-
-        mobile_col = find_column(
-            df.columns,
-            {
-                "mobile",
-                "mobile no",
-                "mobile number",
-                "mobile no."
-            }
-        )
-
-
-        nomination_col = find_column(
-            df.columns,
-            {
-                "nomination status",
-                "nominee status",
-                "nomination",
-                "nominee"
-            }
-        )
-
-
         # =================================================
         # SEARCH & FILTER
         # =================================================
 
-        st.subheader(
-            "🔎 Search & Filter"
-        )
-
+        st.subheader("🔎 Search & Filter")
 
         search_text = st.text_input(
             "🔍 Search UIN, Employee Name, BN, PRAN, Mobile, Status etc."
         )
 
-
         filtered_df = df.copy()
 
+        # =================================================
+        # SEARCH
+        # =================================================
 
         if search_text.strip():
 
-            search_value = (
-                search_text
-                .strip()
-                .casefold()
-            )
-
+            search_value = search_text.strip().casefold()
 
             search_data = (
                 filtered_df
@@ -231,12 +109,9 @@ if uploaded_file is not None:
                 .astype(str)
             )
 
-
             mask = search_data.apply(
                 lambda column:
-                column
-                .str
-                .casefold()
+                column.str.casefold()
                 .str.contains(
                     re.escape(search_value),
                     regex=True,
@@ -244,18 +119,28 @@ if uploaded_file is not None:
                 )
             ).any(axis=1)
 
-
-            filtered_df = (
-                filtered_df
-                .loc[mask]
-                .copy()
-            )
-
+            filtered_df = filtered_df.loc[mask].copy()
 
             st.info(
                 f"🔍 Search result: {len(filtered_df)} record(s) found"
             )
 
+        # =================================================
+        # FIND BN COLUMN
+        # =================================================
+
+        bn_col = None
+
+        for col in df.columns:
+
+            if col.lower() in [
+                "bn",
+                "battalion",
+                "unit"
+            ]:
+
+                bn_col = col
+                break
 
         # =================================================
         # BN FILTER
@@ -271,12 +156,10 @@ if uploaded_file is not None:
                 .tolist()
             )
 
-
             selected_bn = st.selectbox(
                 "🏢 Select BN",
                 ["All"] + bn_values
             )
-
 
             if selected_bn != "All":
 
@@ -286,6 +169,22 @@ if uploaded_file is not None:
                     == selected_bn
                 ]
 
+        # =================================================
+        # FIND STATUS COLUMN
+        # =================================================
+
+        status_col = None
+
+        for col in df.columns:
+
+            if col.lower() in [
+                "status",
+                "case status",
+                "case_status"
+            ]:
+
+                status_col = col
+                break
 
         # =================================================
         # STATUS FILTER
@@ -301,12 +200,10 @@ if uploaded_file is not None:
                 .tolist()
             )
 
-
             selected_status = st.selectbox(
                 "📌 Case Status",
                 ["All"] + status_values
             )
-
 
             if selected_status != "All":
 
@@ -316,24 +213,33 @@ if uploaded_file is not None:
                     == selected_status
                 ]
 
+        # =================================================
+        # FIND CONTRIBUTION COLUMN
+        # =================================================
+
+        amount_col = None
+
+        for col in df.columns:
+
+            if col.lower() in [
+                "amount",
+                "contribution",
+                "total amount"
+            ]:
+
+                amount_col = col
+                break
 
         # =================================================
-        # DASHBOARD
+        # AUTOMATIC DASHBOARD
         # =================================================
 
-        st.subheader(
-            "📊 Automatic Dashboard"
-        )
+        st.subheader("📊 Automatic Dashboard")
 
-
-        total_records = len(
-            filtered_df
-        )
-
+        total_records = len(filtered_df)
 
         pending_count = 0
         completed_count = 0
-
 
         if status_col:
 
@@ -345,7 +251,6 @@ if uploaded_file is not None:
                 .str.casefold()
             )
 
-
             pending_count = (
                 status_data
                 .str.contains(
@@ -354,7 +259,6 @@ if uploaded_file is not None:
                 )
                 .sum()
             )
-
 
             completed_count = (
                 status_data
@@ -366,32 +270,24 @@ if uploaded_file is not None:
                 .sum()
             )
 
-
         # =================================================
         # TOTAL CONTRIBUTION
         # =================================================
 
         total_amount = 0
 
-
         if amount_col:
 
-            total_amount = (
-                pd.to_numeric(
-                    filtered_df[amount_col],
-                    errors="coerce"
-                )
-                .fillna(0)
-                .sum()
-            )
-
+            total_amount = pd.to_numeric(
+                filtered_df[amount_col],
+                errors="coerce"
+            ).fillna(0).sum()
 
         # =================================================
         # KPI
         # =================================================
 
         c1, c2, c3, c4 = st.columns(4)
-
 
         with c1:
 
@@ -400,14 +296,12 @@ if uploaded_file is not None:
                 total_records
             )
 
-
         with c2:
 
             st.metric(
                 "⏳ Pending",
                 pending_count
             )
-
 
         with c3:
 
@@ -416,7 +310,6 @@ if uploaded_file is not None:
                 completed_count
             )
 
-
         with c4:
 
             st.metric(
@@ -424,17 +317,13 @@ if uploaded_file is not None:
                 f"₹{total_amount:,.0f}"
             )
 
-
         # =================================================
         # BN-WISE SUMMARY
         # =================================================
 
         if bn_col:
 
-            st.subheader(
-                "🏢 BN-wise Summary"
-            )
-
+            st.subheader("🏢 BN-wise Summary")
 
             bn_summary = (
                 filtered_df
@@ -445,698 +334,20 @@ if uploaded_file is not None:
                 )
             )
 
-
             if status_col:
 
                 temp = filtered_df.copy()
-
 
                 temp["_status"] = (
                     temp[status_col]
                     .fillna("")
                     .astype(str)
-                    .str.strip()
                     .str.casefold()
                 )
-
 
                 pending = (
                     temp[
                         temp["_status"]
                         .str.contains(
                             "pending",
-                            na=False
-                        )
-                    ]
-                    .groupby(bn_col)
-                    .size()
-                    .rename("Pending")
-                )
-
-
-                completed = (
-                    temp[
-                        temp["_status"]
-                        .str.contains(
-                            "complete|completed|done",
-                            regex=True,
-                            na=False
-                        )
-                    ]
-                    .groupby(bn_col)
-                    .size()
-                    .rename("Completed")
-                )
-
-
-                bn_summary = (
-                    bn_summary
-                    .merge(
-                        pending,
-                        on=bn_col,
-                        how="left"
-                    )
-                    .merge(
-                        completed,
-                        on=bn_col,
-                        how="left"
-                    )
-                )
-
-
-            else:
-
-                bn_summary["Pending"] = 0
-
-                bn_summary["Completed"] = 0
-
-
-            bn_summary["Pending"] = (
-                bn_summary["Pending"]
-                .fillna(0)
-                .astype(int)
-            )
-
-
-            bn_summary["Completed"] = (
-                bn_summary["Completed"]
-                .fillna(0)
-                .astype(int)
-            )
-
-
-            # BN CONTRIBUTION
-
-            if amount_col:
-
-                bn_amount = (
-                    filtered_df
-                    .assign(
-                        _amount=pd.to_numeric(
-                            filtered_df[amount_col],
-                            errors="coerce"
-                        ).fillna(0)
-                    )
-                    .groupby(bn_col)["_amount"]
-                    .sum()
-                    .rename(
-                        "Total Contribution"
-                    )
-                )
-
-
-                bn_summary = (
-                    bn_summary
-                    .merge(
-                        bn_amount,
-                        on=bn_col,
-                        how="left"
-                    )
-                )
-
-
-            else:
-
-                bn_summary[
-                    "Total Contribution"
-                ] = 0
-
-
-            bn_summary[
-                "Total Contribution"
-            ] = (
-                bn_summary[
-                    "Total Contribution"
-                ]
-                .fillna(0)
-            )
-
-
-            st.dataframe(
-                bn_summary,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-        # =================================================
-        # CASE STATUS SUMMARY
-        # =================================================
-
-        if status_col:
-
-            st.subheader(
-                "📌 Case Status Summary"
-            )
-
-
-            status_summary = (
-                filtered_df[status_col]
-                .fillna("Blank")
-                .astype(str)
-                .value_counts()
-                .reset_index()
-            )
-
-
-            status_summary.columns = [
-                "Case Status",
-                "Total"
-            ]
-
-
-            st.dataframe(
-                status_summary,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-        # =================================================
-        # DATA PREVIEW
-        # =================================================
-
-        st.subheader(
-            "📋 Data Preview"
-        )
-
-
-        st.dataframe(
-            filtered_df,
-            use_container_width=True,
-            height=450
-        )
-
-
-        # =================================================
-        # BN REPORT
-        # =================================================
-
-        if bn_col:
-
-            st.subheader(
-                "📊 BN Report"
-            )
-
-
-            if st.button(
-                "📊 Generate BN Report"
-            ):
-
-                report_df = filtered_df.copy()
-
-
-                bn_report = (
-                    report_df
-                    .groupby(bn_col)
-                    .size()
-                    .reset_index(
-                        name="Total Records"
-                    )
-                )
-
-
-                if status_col:
-
-                    temp_report = (
-                        report_df
-                        .copy()
-                    )
-
-
-                    temp_report["_status"] = (
-                        temp_report[status_col]
-                        .fillna("")
-                        .astype(str)
-                        .str.strip()
-                        .str.casefold()
-                    )
-
-
-                    pending_report = (
-                        temp_report[
-                            temp_report["_status"]
-                            .str.contains(
-                                "pending",
-                                na=False
-                            )
-                        ]
-                        .groupby(bn_col)
-                        .size()
-                        .rename(
-                            "Pending"
-                        )
-                    )
-
-
-                    completed_report = (
-                        temp_report[
-                            temp_report["_status"]
-                            .str.contains(
-                                "complete|completed|done",
-                                regex=True,
-                                na=False
-                            )
-                        ]
-                        .groupby(bn_col)
-                        .size()
-                        .rename(
-                            "Completed"
-                        )
-                    )
-
-
-                    bn_report = (
-                        bn_report
-                        .merge(
-                            pending_report,
-                            on=bn_col,
-                            how="left"
-                        )
-                        .merge(
-                            completed_report,
-                            on=bn_col,
-                            how="left"
-                        )
-                    )
-
-
-                else:
-
-                    bn_report["Pending"] = 0
-
-                    bn_report["Completed"] = 0
-
-
-                bn_report["Pending"] = (
-                    bn_report["Pending"]
-                    .fillna(0)
-                    .astype(int)
-                )
-
-
-                bn_report["Completed"] = (
-                    bn_report["Completed"]
-                    .fillna(0)
-                    .astype(int)
-                )
-
-
-                if amount_col:
-
-                    contribution_report = (
-                        report_df
-                        .assign(
-                            _amount=pd.to_numeric(
-                                report_df[amount_col],
-                                errors="coerce"
-                            ).fillna(0)
-                        )
-                        .groupby(bn_col)["_amount"]
-                        .sum()
-                        .rename(
-                            "Total Contribution"
-                        )
-                    )
-
-
-                    bn_report = (
-                        bn_report
-                        .merge(
-                            contribution_report,
-                            on=bn_col,
-                            how="left"
-                        )
-                    )
-
-
-                else:
-
-                    bn_report[
-                        "Total Contribution"
-                    ] = 0
-
-
-                bn_report[
-                    "Total Contribution"
-                ] = (
-                    bn_report[
-                        "Total Contribution"
-                    ]
-                    .fillna(0)
-                )
-
-
-                st.dataframe(
-                    bn_report,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-
-                bn_excel_data = create_excel(
-                    bn_report,
-                    "BN Report"
-                )
-
-
-                st.download_button(
-                    "⬇️ Download BN Report",
-                    data=bn_excel_data,
-                    file_name="BN_Report.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="bn_report_download"
-                )
-
-
-        # =================================================
-        # SMART EMPLOYEE-WISE REPORT
-        # =================================================
-
-        st.subheader(
-            "👤 Smart Employee-wise Report"
-        )
-
-
-        employee_report = filtered_df.copy()
-
-
-        if len(employee_report) > 0:
-
-            # ---------------------------------------------
-            # SELECT IMPORTANT EMPLOYEE COLUMNS
-            # ---------------------------------------------
-
-            employee_columns = []
-
-
-            if uin_col:
-                employee_columns.append(uin_col)
-
-
-            if name_col:
-                employee_columns.append(name_col)
-
-
-            if bn_col:
-                employee_columns.append(bn_col)
-
-
-            if pran_col:
-                employee_columns.append(pran_col)
-
-
-            if mobile_col:
-                employee_columns.append(mobile_col)
-
-
-            if nomination_col:
-                employee_columns.append(
-                    nomination_col
-                )
-
-
-            if status_col:
-                employee_columns.append(
-                    status_col
-                )
-
-
-            if amount_col:
-                employee_columns.append(
-                    amount_col
-                )
-
-
-            # ---------------------------------------------
-            # REMOVE DUPLICATE COLUMN NAMES
-            # ---------------------------------------------
-
-            employee_columns = list(
-                dict.fromkeys(
-                    employee_columns
-                )
-            )
-
-
-            # ---------------------------------------------
-            # CREATE EMPLOYEE REPORT
-            # ---------------------------------------------
-
-            if employee_columns:
-
-                smart_employee_report = (
-                    employee_report[
-                        employee_columns
-                    ]
-                    .copy()
-                )
-
-
-            else:
-
-                smart_employee_report = (
-                    employee_report
-                    .copy()
-                )
-
-
-            # ---------------------------------------------
-            # DISPLAY TOTAL EMPLOYEES
-            # ---------------------------------------------
-
-            if uin_col:
-
-                unique_employees = (
-                    smart_employee_report[
-                        uin_col
-                    ]
-                    .dropna()
-                    .astype(str)
-                    .nunique()
-                )
-
-            elif name_col:
-
-                unique_employees = (
-                    smart_employee_report[
-                        name_col
-                    ]
-                    .dropna()
-                    .astype(str)
-                    .nunique()
-                )
-
-            else:
-
-                unique_employees = len(
-                    smart_employee_report
-                )
-
-
-            st.write(
-                f"👥 Total Unique Employees: "
-                f"**{unique_employees}**"
-            )
-
-
-            # ---------------------------------------------
-            # EMPLOYEE TABLE
-            # ---------------------------------------------
-
-            st.dataframe(
-                smart_employee_report,
-                use_container_width=True,
-                hide_index=True
-            )
-
-
-            # ---------------------------------------------
-            # EMPLOYEE EXCEL DOWNLOAD
-            # ---------------------------------------------
-
-            employee_excel_data = create_excel(
-                smart_employee_report,
-                "Employee Report"
-            )
-
-
-            st.download_button(
-                "⬇️ Download Employee Excel Report",
-                data=employee_excel_data,
-                file_name="Employee_Wise_Report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key="employee_report_download"
-            )
-
-
-            # =================================================
-            # EMPLOYEE SUMMARY
-            # =================================================
-
-            st.subheader(
-                "📊 Employee Summary"
-            )
-
-
-            if uin_col:
-
-                employee_summary = (
-                    employee_report
-                    .groupby(
-                        uin_col,
-                        dropna=False
-                    )
-                    .size()
-                    .reset_index(
-                        name="Records"
-                    )
-                )
-
-
-                # ADD NAME
-
-                if name_col:
-
-                    names = (
-                        employee_report
-                        .groupby(
-                            uin_col,
-                            dropna=False
-                        )[name_col]
-                        .first()
-                        .reset_index()
-                    )
-
-
-                    employee_summary = (
-                        employee_summary
-                        .merge(
-                            names,
-                            on=uin_col,
-                            how="left"
-                        )
-                    )
-
-
-                # ADD BN
-
-                if bn_col:
-
-                    bns = (
-                        employee_report
-                        .groupby(
-                            uin_col,
-                            dropna=False
-                        )[bn_col]
-                        .first()
-                        .reset_index()
-                    )
-
-
-                    employee_summary = (
-                        employee_summary
-                        .merge(
-                            bns,
-                            on=uin_col,
-                            how="left"
-                        )
-                    )
-
-
-                # ADD CONTRIBUTION
-
-                if amount_col:
-
-                    employee_amount = (
-                        employee_report
-                        .assign(
-                            _amount=pd.to_numeric(
-                                employee_report[
-                                    amount_col
-                                ],
-                                errors="coerce"
-                            ).fillna(0)
-                        )
-                        .groupby(
-                            uin_col,
-                            dropna=False
-                        )["_amount"]
-                        .sum()
-                        .reset_index(
-                            name="Total Contribution"
-                        )
-                    )
-
-
-                    employee_summary = (
-                        employee_summary
-                        .merge(
-                            employee_amount,
-                            on=uin_col,
-                            how="left"
-                        )
-                    )
-
-
-                st.dataframe(
-                    employee_summary,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-
-                summary_excel_data = create_excel(
-                    employee_summary,
-                    "Employee Summary"
-                )
-
-
-                st.download_button(
-                    "⬇️ Download Employee Summary",
-                    data=summary_excel_data,
-                    file_name="Employee_Summary.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="employee_summary_download"
-                )
-
-
-        else:
-
-            st.info(
-                "ℹ️ No employee records found."
-            )
-
-
-        # =================================================
-        # FILTERED REPORT DOWNLOAD
-        # =================================================
-
-        st.subheader(
-            "⬇️ Download"
-        )
-
-
-        csv_data = (
-            filtered_df
-            .to_csv(
-                index=False
-            )
-            .encode("utf-8")
-        )
-
-
-        st.download_button(
-            "⬇️ Download Filtered Report",
-            data=csv_data,
-            file_name="filtered_report.csv",
-            mime="text/csv",
-            key="filtered_report_download"
-        )
-
-
-    except Exception as e:
-
-        st.error(
-            f"❌ Error: {e}"
-        )
+                            na
