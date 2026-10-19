@@ -5,7 +5,7 @@ from io import BytesIO
 
 st.set_page_config(page_title="Smart Excel Reporting Agent", page_icon="📊", layout="wide")
 st.title("📊 Smart Excel Reporting Agent")
-st.write("Upload and analyze your Excel data.")
+st.write("Upload and analyze your Excel data — single or multiple files.")
 
 
 def format_excel_bytes(data, special_data_headers=None):
@@ -350,14 +350,59 @@ def make_bn_wise_workbook(df, bn_col, status_col, amount_col, pran_col, nominati
     return format_excel_bytes(out.getvalue())
 
 
-uploaded_file = st.file_uploader("📂 Upload Excel File", type=["xlsx", "xls"])
+uploaded_files = st.file_uploader(
+    "📂 Upload Excel File(s) — Multiple files allowed",
+    type=["xlsx", "xls"],
+    accept_multiple_files=True,
+    help="You can upload multiple Excel files. For large files, the app supports up to 1 GB per file (subject to Streamlit Cloud resources)."
+)
 
-if uploaded_file is not None:
+if uploaded_files:
     try:
-        excel_file = pd.ExcelFile(uploaded_file)
-        st.success("✅ Excel file uploaded successfully!")
-        sheet_name = st.selectbox("📄 Select Sheet", excel_file.sheet_names)
-        df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
+        st.success(f"✅ {len(uploaded_files)} Excel file(s) uploaded successfully!")
+
+        # Build a list of every workbook + sheet. This allows the user to analyze
+        # one file/sheet or combine all uploaded workbooks into one report.
+        workbook_info = []
+        for uf in uploaded_files:
+            xls = pd.ExcelFile(uf)
+            workbook_info.append({"file": uf, "name": uf.name, "sheets": xls.sheet_names})
+
+        st.subheader("📚 Multiple Excel File Analysis")
+        source_options = ["🔗 All Uploaded Files — Combine All Sheets"]
+        for info in workbook_info:
+            for sh in info["sheets"]:
+                source_options.append(f"📄 {info['name']} → {sh}")
+
+        source_choice = st.selectbox(
+            "📑 Select Report Source",
+            source_options,
+            help="Choose a single file/sheet or combine all uploaded files and all their sheets."
+        )
+
+        if source_choice.startswith("🔗 All Uploaded Files"):
+            frames = []
+            for info in workbook_info:
+                for sh in info["sheets"]:
+                    part = pd.read_excel(info["file"], sheet_name=sh)
+                    part.columns = part.columns.astype(str).str.strip()
+                    part.insert(0, "Source Sheet", sh)
+                    part.insert(0, "Source File", info["name"])
+                    frames.append(part)
+            if frames:
+                # Union of all columns so files with slightly different columns
+                # can still be combined safely.
+                df = pd.concat(frames, ignore_index=True, sort=False)
+            else:
+                df = pd.DataFrame()
+            st.info(f"🔗 Combined {len(uploaded_files)} file(s), {len(frames)} sheet(s), {len(df)} record(s).")
+        else:
+            selected_file_name, selected_sheet = source_choice[2:].split(" → ", 1)
+            selected_info = next(x for x in workbook_info if x["name"] == selected_file_name)
+            df = pd.read_excel(selected_info["file"], sheet_name=selected_sheet)
+            df.columns = df.columns.astype(str).str.strip()
+            st.info(f"📄 Viewing: {selected_file_name} → {selected_sheet} ({len(df)} record(s))")
+
         df.columns = df.columns.astype(str).str.strip()
 
         bn_col = find_column(df.columns, {"bn", "battalion", "unit"})
