@@ -414,7 +414,8 @@ uploaded_files = st.file_uploader(
     "Upload Excel File(s) - Multiple files allowed",
     type=["xlsx", "xls"],
     accept_multiple_files=True,
-    help="You can upload multiple Excel files together."
+    max_upload_size=500,
+    help="You can upload multiple Excel files together. Maximum size: 500 MB per file."
 )
 
 if not uploaded_files:
