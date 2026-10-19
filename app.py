@@ -740,6 +740,7 @@ if status_col:
 # =========================================================
 st.subheader("Automatic Dashboard")
 
+# All dashboard figures respect the current Search, BN and Case Status filters.
 total_records = len(filtered_df)
 
 pending_count = (
@@ -756,6 +757,21 @@ completed_count = (
         ).sum()
     )
     if status_col else 0
+)
+
+missing_pran_count = (
+    int(missing_mask(filtered_df[pran_col]).sum())
+    if pran_col else 0
+)
+
+missing_nomination_count = (
+    int(
+        missing_mask(
+            filtered_df[nomination_col],
+            include_no=True
+        ).sum()
+    )
+    if nomination_col else 0
 )
 
 total_amount = (
@@ -789,18 +805,29 @@ elif employee_name_col:
 else:
     unique_employee_count = len(filtered_df)
 
+# Seven compact official dashboard cards.
 c1, c2, c3, c4 = st.columns(4)
+c5, c6, c7 = st.columns(3)
 
 with c1:
-    st.metric("Total Records", total_records)
+    st.metric("Total Records", f"{total_records:,}")
 
 with c2:
-    st.metric("Pending", pending_count)
+    st.metric("Unique Employees", f"{unique_employee_count:,}")
 
 with c3:
-    st.metric("Completed", completed_count)
+    st.metric("Pending", f"{pending_count:,}")
 
 with c4:
+    st.metric("Completed", f"{completed_count:,}")
+
+with c5:
+    st.metric("Missing PRAN", f"{missing_pran_count:,}")
+
+with c6:
+    st.metric("Missing Nomination", f"{missing_nomination_count:,}")
+
+with c7:
     st.metric("Total Contribution", f"INR {total_amount:,.0f}")
 
 # =========================================================
@@ -821,11 +848,43 @@ if bn_col:
         uin_col
     )
 
-    st.dataframe(
-        bn_summary,
-        use_container_width=True,
-        hide_index=True
-    )
+    if not bn_summary.empty:
+        # Add useful percentage indicators for management review.
+        bn_summary["Pending %"] = (
+            bn_summary["Pending"]
+            .div(bn_summary["Total Employees"].replace(0, pd.NA))
+            .mul(100)
+            .fillna(0)
+            .round(1)
+        )
+
+        bn_summary["Completed %"] = (
+            bn_summary["Completed"]
+            .div(bn_summary["Total Employees"].replace(0, pd.NA))
+            .mul(100)
+            .fillna(0)
+            .round(1)
+        )
+
+        st.dataframe(
+            bn_summary,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Visual BN comparison. It uses the same filtered data as the table.
+        chart_data = bn_summary.set_index("BN")[[
+            "Total Employees",
+            "Pending",
+            "Completed",
+            "Missing PRAN",
+            "Missing Nomination"
+        ]]
+
+        st.caption("BN-wise employee and case-status overview")
+        st.bar_chart(chart_data, use_container_width=True)
+    else:
+        st.info("No BN-wise data available for the current filters.")
 
 # =========================================================
 # CASE STATUS SUMMARY
