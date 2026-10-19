@@ -367,6 +367,7 @@ if uploaded_file is not None:
         employee_name_col = find_column(df.columns, {"employee name", "name", "employee_name"})
         pran_col = find_column(df.columns, {"pran", "pran no", "pran number", "pran_number"})
         nomination_col = find_column(df.columns, {"nomination", "nomination status", "nominee", "nominee status"})
+        date_col = find_column(df.columns, {"date", "transaction date", "payment date", "contribution date", "entry date"})
 
         st.subheader("🔎 Search & Filter")
         search_text = st.text_input("🔍 Search UIN, Employee Name, BN, PRAN, Mobile, Status etc.")
@@ -399,6 +400,47 @@ if uploaded_file is not None:
         c2.metric("⏳ Pending", pending_count)
         c3.metric("✅ Completed", completed_count)
         c4.metric("💰 Contribution", f"₹{total_amount:,.0f}")
+
+        # Dashboard Charts
+        st.subheader("📈 Visual Dashboard")
+        chart_left, chart_right = st.columns(2)
+
+        with chart_left:
+            if bn_col and not filtered_df.empty:
+                chart_bn = filtered_df.copy()
+                chart_bn[bn_col] = chart_bn[bn_col].fillna("Blank BN").astype(str)
+                bn_chart = chart_bn.groupby(bn_col).size().sort_values(ascending=False)
+                st.caption("👥 Employees / Records by BN")
+                st.bar_chart(bn_chart)
+            else:
+                st.info("BN-wise chart के लिए BN column आवश्यक है।")
+
+        with chart_right:
+            if status_col and not filtered_df.empty:
+                chart_status = filtered_df[status_col].fillna("Blank").astype(str).value_counts()
+                st.caption("📌 Case Status Distribution")
+                st.bar_chart(chart_status)
+            else:
+                st.info("Status chart के लिए Status column आवश्यक है।")
+
+        # Monthly / Year-wise trend when a date column is available
+        if date_col:
+            chart_dates = pd.to_datetime(filtered_df[date_col], errors="coerce")
+            valid_dates = chart_dates.notna()
+            if valid_dates.any():
+                trend_df = pd.DataFrame({"Date": chart_dates[valid_dates]})
+                trend_df["Month"] = trend_df["Date"].dt.to_period("M").astype(str)
+                monthly_counts = trend_df.groupby("Month").size()
+
+                st.caption("📅 Monthly Record Trend")
+                st.line_chart(monthly_counts)
+
+                years = sorted(trend_df["Date"].dt.year.unique().tolist())
+                if len(years) > 1:
+                    yearly_counts = trend_df.groupby(trend_df["Date"].dt.year).size()
+                    yearly_counts.index = yearly_counts.index.astype(str)
+                    st.caption("📆 Year-wise Record Trend")
+                    st.bar_chart(yearly_counts)
 
         if bn_col:
             st.subheader("🏢 BN-wise Summary")
