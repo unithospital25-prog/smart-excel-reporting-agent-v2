@@ -8,7 +8,7 @@ from io import BytesIO
 # =========================================================
 st.set_page_config(
     page_title="Smart Excel Reporting Agent",
-    page_icon="PATIL_SAM",
+    page_icon="ЁЯУК",
     layout="wide"
 )
 
