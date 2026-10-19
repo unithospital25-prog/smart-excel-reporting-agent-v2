@@ -17,10 +17,13 @@ def format_excel_bytes(data, special_data_headers=None):
 
     wb = load_workbook(BytesIO(data))
 
+    # Official, clean Excel typography
+    # Aptos is the current Microsoft 365 default; Excel will substitute it if unavailable.
+    body_font = Font(name="Aptos", size=10.5, color="1F1F1F")
     header_fill = PatternFill("solid", fgColor="1F4E78")
-    header_font = Font(color="FFFFFF", bold=True, size=11)
+    header_font = Font(name="Aptos Display", color="FFFFFF", bold=True, size=11)
     section_fill = PatternFill("solid", fgColor="D9EAF7")
-    section_font = Font(bold=True, color="1F1F1F")
+    section_font = Font(name="Aptos", bold=True, color="1F1F1F", size=10.5)
     total_fill = PatternFill("solid", fgColor="E2F0D9")
     thin = Side(style="thin", color="B7B7B7")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -72,12 +75,53 @@ def format_excel_bytes(data, special_data_headers=None):
                                 cell.fill = total_fill if c == 2 else PatternFill(fill_type=None)
                 ws.freeze_panes = "A13"
 
-        # Body styling and number/date formats.
+        # Body styling: official font, readable size, borders and wrapping.
         for row in ws.iter_rows():
             for cell in row:
                 if cell.value is not None:
+                    if row[0].row not in header_rows:
+                        cell.font = body_font
                     cell.border = border
-                    cell.alignment = Alignment(vertical="top", wrap_text=True)
+                    cell.alignment = Alignment(vertical="center", horizontal="left", wrap_text=True)
+
+        # Re-apply BN mini-summary typography after body styling.
+        if ws.title not in {"Summary", "BN Summary", "Filtered Data"} and ws.max_row >= 12:
+            if str(ws.cell(1, 1).value).strip().lower() == "particular":
+                for r in range(1, min(9, ws.max_row) + 1):
+                    for c in range(1, 3):
+                        cell = ws.cell(r, c)
+                        if cell.value is not None:
+                            if r == 1:
+                                cell.font = Font(name="Aptos", bold=True, color="1F1F1F", size=10.5)
+                            elif c == 1:
+                                cell.font = Font(name="Aptos", bold=True, color="1F1F1F", size=10.5)
+                            else:
+                                cell.font = Font(name="Aptos", bold=True, color="1F1F1F", size=10.5)
+
+        # Re-apply header typography after body formatting.
+        for hr in header_rows:
+            for cell in ws[hr]:
+                if cell.value is not None:
+                    cell.font = header_font
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        # Auto row height based on wrapped text and current column width.
+        # openpyxl cannot ask Excel to AutoFit, so we calculate a practical height.
+        for r in range(1, ws.max_row + 1):
+            max_lines = 1
+            for c in range(1, ws.max_column + 1):
+                cell = ws.cell(r, c)
+                if cell.value is None:
+                    continue
+                text = str(cell.value)
+                width = ws.column_dimensions[get_column_letter(c)].width or 10
+                # Estimate wrapped lines; keep it bounded for a clean official report.
+                line_count = 0
+                for part in text.split("\n"):
+                    line_count += max(1, (len(part) + int(width) - 1) // max(int(width), 1))
+                max_lines = max(max_lines, line_count)
+            if r not in header_rows:
+                ws.row_dimensions[r].height = min(max(18, 15 * max_lines), 60)
 
         # Auto width with reasonable limits.
         for col_idx in range(1, ws.max_column + 1):
@@ -88,6 +132,22 @@ def format_excel_bytes(data, special_data_headers=None):
                 if value is not None:
                     max_len = max(max_len, len(str(value)))
             ws.column_dimensions[letter].width = min(max(max_len + 2, 10), 35)
+
+        # Recalculate row heights after AutoFit-style column sizing.
+        for r in range(1, ws.max_row + 1):
+            if r in header_rows:
+                continue
+            max_lines = 1
+            for c in range(1, ws.max_column + 1):
+                cell = ws.cell(r, c)
+                if cell.value is None:
+                    continue
+                width = ws.column_dimensions[get_column_letter(c)].width or 10
+                lines = 0
+                for part in str(cell.value).split("\n"):
+                    lines += max(1, (len(part) + max(int(width) - 1, 1)) // max(int(width), 1))
+                max_lines = max(max_lines, lines)
+            ws.row_dimensions[r].height = min(max(18, 15 * max_lines), 60)
 
         # Apply formats based on header names for all detected data tables.
         for hr in header_rows:
@@ -111,9 +171,9 @@ def format_excel_bytes(data, special_data_headers=None):
             ws.column_dimensions["A"].width = 28
             ws.column_dimensions["B"].width = 20
             for r in range(2, ws.max_row + 1):
-                ws.cell(r, 1).font = Font(bold=True)
+                ws.cell(r, 1).font = Font(name="Aptos", bold=True, size=10.5)
                 ws.cell(r, 2).fill = total_fill
-                ws.cell(r, 2).font = Font(bold=True)
+                ws.cell(r, 2).font = Font(name="Aptos", bold=True, size=10.5)
                 ws.cell(r, 2).alignment = Alignment(horizontal="center")
 
         if ws.title == "BN Summary":
