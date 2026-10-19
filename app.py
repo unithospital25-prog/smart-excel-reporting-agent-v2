@@ -8,21 +8,34 @@ from io import BytesIO
 # =========================================================
 st.set_page_config(
     page_title="Smart Excel Reporting Agent",
-    page_icon="ЁЯУК",
+    page_icon="X",
     layout="wide"
 )
 
 # =========================================================
 # CUSTOM UI
 # =========================================================
-st.markdown(""" <style> .main-title { font-size: 42px; font-weight: 800; margin-bottom: 5px; } .sub-title { font-size: 18px; color: #6b7280; margin-bottom: 20px; } </style> """, unsafe_allow_html=True)
+st.markdown("""
+<style>
+.main-title {
+    font-size: 42px;
+    font-weight: 800;
+    margin-bottom: 5px;
+}
+.sub-title {
+    font-size: 18px;
+    color: #6b7280;
+    margin-bottom: 20px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.markdown(
-    '<div class="main-title">ЁЯУК Smart Excel Reporting Agent</div>',
+    '<div class="main-title">Smart Excel Reporting Agent</div>',
     unsafe_allow_html=True
 )
 st.markdown(
-    '<div class="sub-title">Upload and analyze your Excel data тАФ single or multiple files.</div>',
+    '<div class="sub-title">Upload and analyze your Excel data - single or multiple files.</div>',
     unsafe_allow_html=True
 )
 
@@ -241,7 +254,15 @@ def missing_mask(series, include_no=False):
     return data.isin(values)
 
 
-def build_bn_summary( dataframe, bn_col, status_col, amount_col, pran_col, nomination_col, uin_col ):
+def build_bn_summary(
+    dataframe,
+    bn_col,
+    status_col,
+    amount_col,
+    pran_col,
+    nomination_col,
+    uin_col
+):
     if not bn_col:
         return pd.DataFrame()
 
@@ -330,18 +351,18 @@ def build_bn_summary( dataframe, bn_col, status_col, amount_col, pran_col, nomin
 # MULTIPLE EXCEL FILE UPLOAD
 # =========================================================
 uploaded_files = st.file_uploader(
-    "ЁЯУВ Upload Excel File(s) тАФ Multiple files allowed",
+    "Upload Excel File(s) - Multiple files allowed",
     type=["xlsx", "xls"],
     accept_multiple_files=True,
     help="You can upload multiple Excel files together."
 )
 
 if not uploaded_files:
-    st.info("ЁЯУВ Please upload one or more Excel files to start.")
+    st.info("Please upload one or more Excel files to start.")
     st.stop()
 
 st.success(
-    f"тЬЕ {len(uploaded_files)} Excel file(s) uploaded successfully!"
+    f"{len(uploaded_files)} Excel file(s) uploaded successfully."
 )
 
 # =========================================================
@@ -383,11 +404,11 @@ for uploaded_file in uploaded_files:
 
     except Exception as e:
         st.warning(
-            f"тЪая╕П {uploaded_file.name} read рдирд╣реАрдВ рд╣реЛ рд╕рдХреА: {e}"
+            f"Unable to read {uploaded_file.name}: {e}"
         )
 
 if not all_dataframes:
-    st.error("тЭМ рдХрд┐рд╕реА рднреА Excel file рдореЗрдВ readable data рдирд╣реАрдВ рдорд┐рд▓рд╛ред")
+    st.error("No readable data was found in the uploaded Excel files.")
     st.stop()
 
 # Combine all files
@@ -404,14 +425,14 @@ df.columns = (
 )
 
 st.success(
-    f"тЬЕ рд╕рднреА files рдХрд╛ data successfully combine рд╣реЛ рдЧрдпрд╛! "
+    f"All uploaded files were combined successfully. "
     f"Total Records: {len(df):,}"
 )
 
 # =========================================================
 # SOURCE FILE SUMMARY
 # =========================================================
-with st.expander("ЁЯУБ Uploaded Files Summary"):
+with st.expander("Uploaded Files Summary"):
     source_summary = pd.DataFrame(file_sheet_summary)
     st.dataframe(
         source_summary,
@@ -480,10 +501,10 @@ nomination_col = find_column(
 # =========================================================
 # SEARCH & FILTER
 # =========================================================
-st.subheader("ЁЯФО Search & Filter")
+st.subheader("Search and Filter")
 
 search_text = st.text_input(
-    "ЁЯФН Search UIN, Employee Name, BN, PRAN, Mobile, Status etc."
+    "Search UIN, Employee Name, BN, PRAN, Mobile, Status, etc."
 )
 
 filtered_df = df.copy()
@@ -508,7 +529,7 @@ if search_text.strip():
     filtered_df = filtered_df.loc[mask].copy()
 
     st.info(
-        f"ЁЯФН Search result: {len(filtered_df)} record(s) found"
+        f"Search result: {len(filtered_df)} record(s) found."
     )
 
 # BN filter
@@ -522,7 +543,7 @@ if bn_col:
     )
 
     selected_bn = st.selectbox(
-        "ЁЯПв Select BN",
+        "Select BN",
         ["All"] + bn_values
     )
 
@@ -542,7 +563,7 @@ if status_col:
     )
 
     selected_status = st.selectbox(
-        "ЁЯУМ Case Status",
+        "Case Status",
         ["All"] + status_values
     )
 
@@ -554,7 +575,7 @@ if status_col:
 # =========================================================
 # DASHBOARD
 # =========================================================
-st.subheader("ЁЯУК Automatic Dashboard")
+st.subheader("Automatic Dashboard")
 
 total_records = len(filtered_df)
 
@@ -608,16 +629,16 @@ else:
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
-    st.metric("ЁЯУЛ Total Records", total_records)
+    st.metric("Total Records", total_records)
 
 with c2:
-    st.metric("тП│ Pending", pending_count)
+    st.metric("Pending", pending_count)
 
 with c3:
-    st.metric("тЬЕ Completed", completed_count)
+    st.metric("Completed", completed_count)
 
 with c4:
-    st.metric("ЁЯТ░ Contribution", f"тВ╣{total_amount:,.0f}")
+    st.metric("Total Contribution", f"INR {total_amount:,.0f}")
 
 # =========================================================
 # BN-WISE SUMMARY
@@ -625,7 +646,7 @@ with c4:
 bn_summary = pd.DataFrame()
 
 if bn_col:
-    st.subheader("ЁЯПв BN-wise Summary")
+    st.subheader("BN-wise Summary")
 
     bn_summary = build_bn_summary(
         filtered_df,
@@ -649,7 +670,7 @@ if bn_col:
 status_summary = pd.DataFrame()
 
 if status_col:
-    st.subheader("ЁЯУМ Case Status Summary")
+    st.subheader("Case Status Summary")
 
     status_summary = (
         filtered_df[status_col]
@@ -674,10 +695,10 @@ if status_col:
 # BN REPORT
 # =========================================================
 if bn_col:
-    st.subheader("ЁЯУК BN Report")
+    st.subheader("BN Report")
 
     if st.button(
-        "ЁЯУК Generate BN Report",
+        "Generate BN Report",
         key="generate_bn_report"
     ):
         st.dataframe(
@@ -692,7 +713,7 @@ if bn_col:
         )
 
         st.download_button(
-            "тмЗя╕П Download BN Report",
+            "Download BN Report",
             data=bn_excel,
             file_name="BN_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -702,12 +723,12 @@ if bn_col:
 # =========================================================
 # SMART EMPLOYEE-WISE REPORT
 # =========================================================
-st.subheader("ЁЯСд Smart Employee-wise Report")
+st.subheader("Employee-wise Report")
 
 employee_report = filtered_df.copy()
 
 st.write(
-    f"ЁЯСе Total Unique Employees: **{unique_employee_count}**"
+    f"Total Unique Employees: **{unique_employee_count}**"
 )
 
 if len(employee_report) > 0:
@@ -724,14 +745,14 @@ if len(employee_report) > 0:
     )
 
     st.download_button(
-        "тмЗя╕П Download Employee Excel Report",
+        "Download Employee Excel Report",
         data=employee_excel,
         file_name="Employee_Wise_Report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key="download_employee_report"
     )
 else:
-    st.info("тД╣я╕П No employee records found.")
+    st.info("No employee records found.")
 
 # =========================================================
 # DUPLICATE UIN
@@ -739,7 +760,7 @@ else:
 duplicate_uin_report = pd.DataFrame()
 
 if uin_col:
-    st.subheader("тЪая╕П Duplicate UIN Report")
+    st.subheader("Duplicate UIN Report")
 
     uin_data = (
         employee_report[uin_col]
@@ -759,7 +780,7 @@ if uin_col:
 
     if len(duplicate_uin_report) > 0:
         st.warning(
-            f"тЪая╕П Duplicate UIN Records: "
+            f"Duplicate UIN Records: "
             f"{len(duplicate_uin_report)}"
         )
 
@@ -775,14 +796,14 @@ if uin_col:
         )
 
         st.download_button(
-            "тмЗя╕П Download Duplicate UIN Report",
+            "Download Duplicate UIN Report",
             data=duplicate_excel,
             file_name="Duplicate_UIN_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="download_duplicate_uin"
         )
     else:
-        st.success("тЬЕ No Duplicate UIN found.")
+        st.success("No duplicate UIN found.")
 
 # =========================================================
 # MISSING PRAN
@@ -790,7 +811,7 @@ if uin_col:
 missing_pran_report = pd.DataFrame()
 
 if pran_col:
-    st.subheader("тЭМ Missing PRAN Report")
+    st.subheader("Missing PRAN Report")
 
     missing_pran_mask = missing_mask(
         employee_report[pran_col]
@@ -802,7 +823,7 @@ if pran_col:
 
     if len(missing_pran_report) > 0:
         st.warning(
-            f"тЭМ Employees without PRAN: "
+            f"Employees without PRAN: "
             f"{len(missing_pran_report)}"
         )
 
@@ -818,14 +839,14 @@ if pran_col:
         )
 
         st.download_button(
-            "тмЗя╕П Download Missing PRAN Report",
+            "Download Missing PRAN Report",
             data=missing_pran_excel,
             file_name="Missing_PRAN_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="download_missing_pran"
         )
     else:
-        st.success("тЬЕ All employees have PRAN.")
+        st.success("All employees have PRAN.")
 
 # =========================================================
 # MISSING NOMINATION
@@ -833,7 +854,7 @@ if pran_col:
 missing_nomination_report = pd.DataFrame()
 
 if nomination_col:
-    st.subheader("тЭМ Missing Nomination Report")
+    st.subheader("Missing Nomination Report")
 
     missing_nomination_mask = missing_mask(
         employee_report[nomination_col],
@@ -846,7 +867,7 @@ if nomination_col:
 
     if len(missing_nomination_report) > 0:
         st.warning(
-            f"тЭМ Employees with missing nomination: "
+            f"Employees with missing nomination: "
             f"{len(missing_nomination_report)}"
         )
 
@@ -862,28 +883,28 @@ if nomination_col:
         )
 
         st.download_button(
-            "тмЗя╕П Download Missing Nomination Report",
+            "Download Missing Nomination Report",
             data=nomination_excel,
             file_name="Missing_Nomination_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="download_missing_nomination"
         )
     else:
-        st.success("тЬЕ All employees have nomination.")
+        st.success("All employees have nomination.")
 
 # =========================================================
 # BN-WISE COMPLETE EXCEL REPORT
 # =========================================================
 if bn_col:
-    st.subheader("ЁЯУЪ BN-wise Complete Excel Report")
+    st.subheader("BN-wise Complete Excel Report")
 
     st.write(
-        "рдПрдХ Excel file рдореЗрдВ Summary + BN Summary + Filtered Data "
-        "рдФрд░ рдкреНрд░рддреНрдпреЗрдХ BN рдХреА рдЕрд▓рдЧ sheet рддреИрдпрд╛рд░ рд╣реЛрдЧреАред"
+        "One Excel file containing Summary, BN Summary, Filtered Data, "
+        "and a separate sheet for each BN."
     )
 
     if st.button(
-        "ЁЯУЪ Generate BN-wise Complete Excel Report",
+        "Generate BN-wise Complete Excel Report",
         key="generate_bn_complete_report"
     ):
         bn_output = BytesIO()
@@ -1097,11 +1118,11 @@ if bn_col:
         bn_output.seek(0)
 
         st.success(
-            "тЬЕ BN-wise Complete Excel Report рддреИрдпрд╛рд░ рд╣реИред"
+            "BN-wise Complete Excel Report is ready."
         )
 
         st.download_button(
-            "тмЗя╕П Download BN-wise Complete Excel Report",
+            "Download BN-wise Complete Excel Report",
             data=bn_output.getvalue(),
             file_name="BN_Wise_Complete_Report.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1111,14 +1132,14 @@ if bn_col:
 # =========================================================
 # COMPLETE MASTER REPORT
 # =========================================================
-st.subheader("ЁЯУж Complete Master Report")
+st.subheader("Complete Master Report")
 
 st.write(
-    "рдПрдХ button рд╕реЗ рд╕рднреА рдорд╣рддреНрд╡рдкреВрд░реНрдг reports рдПрдХ рд╣реА Excel file рдореЗрдВ рддреИрдпрд╛рд░ рдХрд░реЗрдВред"
+    "Generate all important reports in a single Excel file."
 )
 
 if st.button(
-    "ЁЯУж Generate Complete Master Report",
+    "Generate Complete Master Report",
     key="generate_master_report"
 ):
     master_output = BytesIO()
@@ -1291,11 +1312,11 @@ if st.button(
     master_output.seek(0)
 
     st.success(
-        "тЬЕ Complete Master Report рддреИрдпрд╛рд░ рд╣реИред"
+        "Complete Master Report is ready."
     )
 
     st.download_button(
-        "тмЗя╕П Download Complete Master Report",
+        "Download Complete Master Report",
         data=master_output.getvalue(),
         file_name="Complete_Master_Report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1305,7 +1326,7 @@ if st.button(
 # =========================================================
 # DATA PREVIEW
 # =========================================================
-st.subheader("ЁЯУЛ Data Preview")
+st.subheader("Data Preview")
 
 st.dataframe(
     filtered_df,
@@ -1322,7 +1343,7 @@ filtered_excel = make_excel(
 )
 
 st.download_button(
-    "тмЗя╕П Download Filtered Excel Report",
+    "Download Filtered Excel Report",
     data=filtered_excel,
     file_name="Filtered_Report.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
