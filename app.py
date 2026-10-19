@@ -8,12 +8,131 @@ st.title("📊 Smart Excel Reporting Agent")
 st.write("Upload and analyze your Excel data.")
 
 
-def make_excel(df, sheet="Report"):
-    out = BytesIO()
-    with pd.ExcelWriter(out, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name=str(sheet)[:31])
-    out.seek(0)
-    return out.getvalue()
+def format_excel_bytes(data, special_data_headers=None):
+    """Apply professional formatting to an Excel workbook."""
+    from openpyxl import load_workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.page import PageMargins
+
+    wb = load_workbook(BytesIO(data))
+
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    section_fill = PatternFill("solid", fgColor="D9EAF7")
+    section_font = Font(bold=True, color="1F1F1F")
+    total_fill = PatternFill("solid", fgColor="E2F0D9")
+    thin = Side(style="thin", color="B7B7B7")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    for ws in wb.worksheets:
+        ws.sheet_view.showGridLines = False
+        ws.freeze_panes = "A2"
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_setup.orientation = "landscape"
+        ws.page_setup.paperSize = ws.PAPERSIZE_A4
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.print_options.horizontalCentered = False
+        ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.5, bottom=0.5, header=0.2, footer=0.2)
+        ws.oddFooter.center.text = "Page &P of &N"
+        ws.oddFooter.right.text = "Smart Excel Reporting Agent"
+
+        # Find all header rows. Normal sheets have row 1; BN sheets have a second table.
+        header_rows = [1] if ws.max_row >= 1 else []
+        for r in range(2, min(ws.max_row, 20) + 1):
+            values = [ws.cell(r, c).value for c in range(1, min(ws.max_column, 12) + 1)]
+            if any(str(v).strip().lower() in {"uin", "employee number", "employee name", "pran no", "status", "amount", "date"} for v in values if v is not None):
+                header_rows.append(r)
+                break
+
+        for hr in header_rows:
+            for cell in ws[hr]:
+                if cell.value is not None:
+                    cell.fill = header_fill
+                    cell.font = header_font
+                    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    cell.border = border
+            ws.row_dimensions[hr].height = 25
+
+        # BN sheet mini-summary section.
+        if ws.title not in {"Summary", "BN Summary", "Filtered Data"} and ws.max_row >= 12:
+            # If row 1 is a Particular/Value mini-summary, style it softly.
+            if str(ws.cell(1, 1).value).strip().lower() == "particular":
+                for r in range(1, min(9, ws.max_row) + 1):
+                    for c in range(1, 3):
+                        cell = ws.cell(r, c)
+                        if cell.value is not None:
+                            cell.border = border
+                            cell.alignment = Alignment(vertical="center", wrap_text=True)
+                            if r == 1:
+                                cell.fill = section_fill
+                                cell.font = section_font
+                            elif r in {2, 3, 4, 5, 6, 7, 8, 9}:
+                                cell.fill = total_fill if c == 2 else PatternFill(fill_type=None)
+                ws.freeze_panes = "A13"
+
+        # Body styling and number/date formats.
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is not None:
+                    cell.border = border
+                    cell.alignment = Alignment(vertical="top", wrap_text=True)
+
+        # Auto width with reasonable limits.
+        for col_idx in range(1, ws.max_column + 1):
+            letter = get_column_letter(col_idx)
+            max_len = 0
+            for row in range(1, min(ws.max_row, 300) + 1):
+                value = ws.cell(row, col_idx).value
+                if value is not None:
+                    max_len = max(max_len, len(str(value)))
+            ws.column_dimensions[letter].width = min(max(max_len + 2, 10), 35)
+
+        # Apply formats based on header names for all detected data tables.
+        for hr in header_rows:
+            headers = {str(ws.cell(hr, c).value).strip().casefold(): c for c in range(1, ws.max_column + 1) if ws.cell(hr, c).value is not None}
+            for name, c in headers.items():
+                for r in range(hr + 1, ws.max_row + 1):
+                    cell = ws.cell(r, c)
+                    if "amount" in name or "contribution" in name:
+                        if isinstance(cell.value, (int, float)):
+                            cell.number_format = '#,##0.00'
+                    if name == "date" or name.endswith(" date") or "date" in name:
+                        if hasattr(cell.value, "strftime"):
+                            cell.number_format = "dd-mm-yyyy"
+
+        # Summary sheets: make value column prominent and add autofilter.
+        if ws.title in {"Summary", "BN Summary", "Case Status", "Filtered Data", "Employee Report", "Missing PRAN", "Missing Nomination", "Duplicate UIN", "BN Report"}:
+            if ws.max_row >= 1 and ws.max_column >= 1:
+                ws.auto_filter.ref = ws.dimensions
+
+        if ws.title == "Summary":
+            ws.column_dimensions["A"].width = 28
+            ws.column_dimensions["B"].width = 20
+            for r in range(2, ws.max_row + 1):
+                ws.cell(r, 1).font = Font(bold=True)
+                ws.cell(r, 2).fill = total_fill
+                ws.cell(r, 2).font = Font(bold=True)
+                ws.cell(r, 2).alignment = Alignment(horizontal="center")
+
+        if ws.title == "BN Summary":
+            ws.freeze_panes = "A2"
+            for c in range(1, ws.max_column + 1):
+                ws.column_dimensions[get_column_letter(c)].width = min(max(ws.column_dimensions[get_column_letter(c)].width or 10, 14), 24)
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+def make_excel(dataframe, sheet_name="Report"):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        dataframe.to_excel(writer, index=False, sheet_name=str(sheet_name)[:31])
+    output.seek(0)
+    return format_excel_bytes(output.getvalue())
 
 
 def find_column(columns, names):
@@ -168,7 +287,7 @@ def make_bn_wise_workbook(df, bn_col, status_col, amount_col, pran_col, nominati
             part.to_excel(writer, index=False, sheet_name=sheet, startrow=len(mini)+3)
 
     out.seek(0)
-    return out.getvalue()
+    return format_excel_bytes(out.getvalue())
 
 
 uploaded_file = st.file_uploader("📂 Upload Excel File", type=["xlsx", "xls"])
@@ -242,6 +361,7 @@ if uploaded_file is not None:
         # NEW FEATURE
         st.subheader("📚 BN-wise Complete Excel Report")
         st.write("एक button से Summary, BN Summary और हर BN की अलग Excel Sheet तैयार करें।")
+        st.caption("✨ Excel में automatic formatting, filter, freeze header, A4 landscape और column sizing भी लागू होगी।")
         if st.button("📚 Generate BN-wise Complete Excel Report", key="generate_bn_wise_complete_report"):
             if not bn_col:
                 st.error("❌ BN / Battalion / Unit column नहीं मिला।")
@@ -319,8 +439,9 @@ if uploaded_file is not None:
                 (status_summary if status_col else pd.DataFrame({"Message": ["Status column not found"]})).to_excel(writer, index=False, sheet_name="Case Status")
                 filtered_df.to_excel(writer, index=False, sheet_name="Filtered Data")
             out.seek(0)
+            master_data = format_excel_bytes(out.getvalue())
             st.success("✅ Complete Master Report तैयार है — सभी reports एक Excel file में हैं।")
-            st.download_button("⬇️ Download Complete Master Report", out.getvalue(), "Complete_Master_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="download_complete_master_report")
+            st.download_button("⬇️ Download Complete Master Report", master_data, "Complete_Master_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="download_complete_master_report")
 
         st.subheader("📋 Data Preview")
         st.dataframe(filtered_df, use_container_width=True, height=450)
