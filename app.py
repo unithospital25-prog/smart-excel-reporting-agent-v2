@@ -208,27 +208,57 @@ def normalize_columns(columns):
     result = []
     used = {}
 
+    # Map common alternate Excel headings to one master heading.
+    # This is important when different BN files use slightly different
+    # headings for the same field.
     preferred_names = {
+        # UIN / employee number
         "uin": "UIN",
+        "employee_number": "UIN",
+        "employee_no": "UIN",
+        "employee_id": "UIN",
+        "employee_code": "UIN",
+
+        # Employee name
         "employee_name": "Employee Name",
-        "name": "Name",
+        "name": "Employee Name",
+        "employee": "Employee Name",
+
+        # BN / Battalion / Unit
         "bn": "BN",
-        "battalion": "Battalion",
-        "unit": "Unit",
-        "pran": "PRAN",
+        "battalion": "BN",
+        "battalion_no": "BN",
+        "battalion_number": "BN",
+        "unit": "BN",
+        "unit_name": "BN",
+
+        # PRAN
+        "pran": "PRAN No",
         "pran_no": "PRAN No",
-        "pran_number": "PRAN Number",
+        "pran_number": "PRAN No",
+        "pran_no_": "PRAN No",
+
+        # Status
         "status": "Status",
         "case_status": "Case Status",
+
+        # Amount / contribution
         "amount": "Amount",
         "contribution": "Contribution",
         "total_amount": "Total Amount",
+
+        # Nomination
         "nomination": "Nomination",
         "nomination_status": "Nomination Status",
         "nominee": "Nominee",
         "nominee_status": "Nominee Status",
-        "mobile": "Mobile",
-        "mobile_no": "Mobile No"
+
+        # Mobile
+        "mobile": "Mobile No",
+        "mobile_no": "Mobile No",
+        "mobile_number": "Mobile No",
+        "phone": "Mobile No",
+        "phone_no": "Mobile No"
     }
 
     for original in columns:
@@ -249,6 +279,47 @@ def normalize_columns(columns):
         result.append(final_name)
 
     return result
+
+
+def merge_duplicate_master_columns(dataframe):
+    """Merge duplicate canonical columns created by mixed Excel headings.
+
+    Example: if a workbook contains both Employee Name and Name, both are
+    normalized to Employee Name. Their non-empty values are combined into
+    one column so the master report does not show duplicate/None fields.
+    """
+    df_local = dataframe.copy()
+
+    # Pandas can contain duplicate column labels after concatenation.
+    # Work through positions so the operation remains safe.
+    groups = {}
+    for idx, col in enumerate(df_local.columns):
+        base = str(col).strip()
+        if re.match(r"^(.+)_\d+$", base):
+            base_name = re.sub(r"_\d+$", "", base)
+        else:
+            base_name = base
+        groups.setdefault(base_name, []).append(idx)
+
+    for base_name, positions in groups.items():
+        if len(positions) <= 1:
+            continue
+
+        combined = pd.Series(pd.NA, index=df_local.index, dtype="object")
+        for pos in positions:
+            series = df_local.iloc[:, pos]
+            clean = series.replace({"": pd.NA, "None": pd.NA, "nan": pd.NA})
+            combined = combined.fillna(clean)
+
+        # Keep the first column and drop the extra copies.
+        first_pos = positions[0]
+        df_local.iloc[:, first_pos] = combined
+
+        drop_positions = positions[1:]
+        drop_columns = [df_local.columns[pos] for pos in drop_positions]
+        df_local = df_local.drop(columns=drop_columns)
+
+    return df_local
 
 
 def find_column(columns, possible_names):
@@ -414,8 +485,7 @@ uploaded_files = st.file_uploader(
     "Upload Excel File(s) - Multiple files allowed",
     type=["xlsx", "xls"],
     accept_multiple_files=True,
-    max_upload_size=500,
-    help="You can upload multiple Excel files together. Maximum size: 500 MB per file."
+    help="You can upload multiple Excel files together."
 )
 
 if not uploaded_files:
@@ -449,6 +519,7 @@ for uploaded_file in uploaded_files:
             # This makes headings such as "UIN", "Uin", "UIN ", etc.
             # behave as the same column across different Excel files.
             temp_df.columns = normalize_columns(temp_df.columns)
+            temp_df = merge_duplicate_master_columns(temp_df)
 
             # Remove completely blank rows. This prevents empty Excel rows
             # from appearing as None records in the combined master data.
@@ -495,6 +566,7 @@ df = pd.concat(
 )
 
 df.columns = normalize_columns(df.columns)
+df = merge_duplicate_master_columns(df)
 
 # Remove any rows that are completely blank after the final merge.
 # Source File and Source Sheet are ignored for this check because they
