@@ -771,37 +771,54 @@ nomination_col = find_column(
 # REMOVE BLANK / NONE ROWS AFTER MULTI-FILE COMBINE
 # ============================================================
 
-record_columns = [
+# Primary business fields
+primary_record_columns = [
     uin_col,
     employee_name_col,
-    bn_col,
+    bn_col
+]
+
+primary_record_columns = [
+    col
+    for col in primary_record_columns
+    if col is not None and col in df.columns
+]
+
+# Secondary business fields
+secondary_record_columns = [
     pran_col,
     nomination_col,
     status_col,
     amount_col
 ]
 
-# Keep only columns that actually exist in dataframe
-record_columns = [
-    col for col in record_columns
+secondary_record_columns = [
+    col
+    for col in secondary_record_columns
     if col is not None and col in df.columns
 ]
 
-if record_columns:
+if primary_record_columns:
 
-    record_check = pd.DataFrame(index=df.index)
+    primary_check = pd.DataFrame(
+        index=df.index
+    )
 
-    for col in record_columns:
+    for col in primary_record_columns:
 
         values = (
             df[col]
             .astype("string")
-            .str.replace("\u00a0", " ", regex=False)
+            .str.replace(
+                "\u00a0",
+                " ",
+                regex=False
+            )
             .str.strip()
             .str.casefold()
         )
 
-        record_check[col] = (
+        primary_check[col] = (
             values.notna()
             & ~values.isin([
                 "",
@@ -815,14 +832,74 @@ if record_columns:
             ])
         )
 
-    # Keep row only when at least ONE real business-data
-    # field contains meaningful information
-    valid_record_mask = record_check.any(axis=1)
+    # A real employee record must have
+    # UIN OR Employee Name OR BN
+    valid_record_mask = primary_check.any(
+        axis=1
+    )
 
-    df = df.loc[valid_record_mask].copy()
+    df = df.loc[
+        valid_record_mask
+    ].copy()
 
-    # Re-number rows after removing blank rows
-    df.reset_index(drop=True, inplace=True)
+else:
+
+    # Fallback when primary columns are not detected
+    if secondary_record_columns:
+
+        secondary_check = pd.DataFrame(
+            index=df.index
+        )
+
+        for col in secondary_record_columns:
+
+            values = (
+                df[col]
+                .astype("string")
+                .str.replace(
+                    "\u00a0",
+                    " ",
+                    regex=False
+                )
+                .str.strip()
+                .str.casefold()
+            )
+
+            secondary_check[col] = (
+                values.notna()
+                & ~values.isin([
+                    "",
+                    "none",
+                    "nan",
+                    "null",
+                    "n/a",
+                    "na",
+                    "nat",
+                    "-"
+                ])
+            )
+
+        valid_record_mask = secondary_check.any(
+            axis=1
+        )
+
+        df = df.loc[
+            valid_record_mask
+        ].copy()
+
+# Final cleanup
+df = clean_empty_rows(
+    df,
+    exclude_columns=[
+        "Source File",
+        "Source Sheet"
+    ]
+)
+
+df.reset_index(
+    drop=True,
+    inplace=True
+)
 # =========================================================
 # SEARCH & FILTER
 # =========================================================
