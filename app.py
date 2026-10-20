@@ -246,27 +246,50 @@ def normalize_columns(columns):
     result = []
     used = {}
 
-    preferred_names = {
+        preferred_names = {
+        # UIN / Employee Number
         "uin": "UIN",
+        "employee_number": "UIN",
+        "employee_no": "UIN",
+        "employee_id": "UIN",
+        "employee_code": "UIN",
+
+        # Employee Name
         "employee_name": "Employee Name",
-        "name": "Name",
+        "name": "Employee Name",
+        "employee": "Employee Name",
+
+        # Battalion / BN
         "bn": "BN",
-        "battalion": "Battalion",
-        "unit": "Unit",
+        "battalion": "BN",
+        "battalion_no": "BN",
+        "bn_no": "BN",
+        "unit": "BN",
+
+        # PRAN
         "pran": "PRAN",
-        "pran_no": "PRAN No",
-        "pran_number": "PRAN Number",
+        "pran_no": "PRAN",
+        "pran_number": "PRAN",
+        "pran_num": "PRAN",
+
+        # Status
         "status": "Status",
-        "case_status": "Case Status",
+        "case_status": "Status",
+
+        # Amount
         "amount": "Amount",
-        "contribution": "Contribution",
-        "total_amount": "Total Amount",
+        "contribution": "Amount",
+        "total_amount": "Amount",
+
+        # Nomination
         "nomination": "Nomination",
-        "nomination_status": "Nomination Status",
-        "nominee": "Nominee",
-        "nominee_status": "Nominee Status",
+        "nomination_status": "Nomination",
+        "nominee": "Nomination",
+        "nominee_status": "Nomination",
+
+        # Mobile
         "mobile": "Mobile",
-        "mobile_no": "Mobile No"
+        "mobile_no": "Mobile"
     }
 
     for original in columns:
