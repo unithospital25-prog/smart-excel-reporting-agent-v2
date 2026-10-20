@@ -250,7 +250,7 @@ def safe_sheet_name(name, used_names=None):
     name = str(name)
 
     name = re.sub(
-        r'[\:\*\?\/\\]',
+        r'[\[\]\:\*\?\/\\]',
         "_",
         name
     )
@@ -1325,4 +1325,1267 @@ if search_text.strip():
 
     master_search_mask = (
         master_search_data.apply(
-            lambda
+            lambda col:
+            col.str.casefold()
+            .str.contains(
+                re.escape(search_value),
+                regex=True,
+                na=False
+            )
+        )
+        .any(axis=1)
+    )
+
+    master_filtered_df = (
+        master_filtered_df.loc[
+            master_search_mask
+        ].copy()
+    )
+
+
+if (
+    bn_col
+    and selected_bn != "All"
+):
+
+    master_filtered_df = (
+        master_filtered_df[
+            master_filtered_df[bn_col]
+            .astype(str)
+            == selected_bn
+        ].copy()
+    )
+
+
+if (
+    status_col
+    and selected_status != "All"
+):
+
+    master_filtered_df = (
+        master_filtered_df[
+            master_filtered_df[status_col]
+            .astype(str)
+            == selected_status
+        ].copy()
+    )
+
+
+# =========================================================
+# UNIQUE EMPLOYEE MASTER VIEW
+# =========================================================
+
+st.subheader(
+    "Unique Employee Master"
+)
+
+st.caption(
+    "One unique record per UIN. "
+    "Duplicate UIN records remain available "
+    "in the Duplicate UIN Report."
+)
+
+st.info(
+    "Unique Employee Master: "
+    f"{len(master_filtered_df):,} employee(s)"
+)
+
+st.dataframe(
+    master_filtered_df,
+    use_container_width=True,
+    hide_index=True,
+    height=400
+)
+
+master_excel = make_excel(
+    master_filtered_df,
+    "Employee Master"
+)
+
+st.download_button(
+    "Download Unique Employee Master",
+    data=master_excel,
+    file_name="Unique_Employee_Master.xlsx",
+    mime=(
+        "application/vnd.openxmlformats-officedocument."
+        "spreadsheetml.sheet"
+    ),
+    key="download_unique_employee_master"
+)
+
+
+# =========================================================
+# DASHBOARD
+# =========================================================
+
+st.subheader(
+    "Automatic Dashboard"
+)
+
+total_records = len(
+    filtered_df
+)
+
+unique_employee_count = len(
+    master_filtered_df
+)
+
+
+pending_count = (
+    int(
+        status_mask(
+            master_filtered_df,
+            status_col,
+            "pending"
+        ).sum()
+    )
+    if status_col
+    else 0
+)
+
+
+completed_count = (
+    int(
+        status_mask(
+            master_filtered_df,
+            status_col,
+            "complete|completed|done"
+        ).sum()
+    )
+    if status_col
+    else 0
+)
+
+
+total_amount = (
+    pd.to_numeric(
+        master_filtered_df[amount_col],
+        errors="coerce"
+    )
+    .fillna(0)
+    .sum()
+    if amount_col
+    else 0
+)
+
+
+missing_pran_count = (
+    int(
+        missing_mask(
+            master_filtered_df[pran_col]
+        ).sum()
+    )
+    if pran_col
+    else 0
+)
+
+
+missing_nomination_count = (
+    int(
+        missing_mask(
+            master_filtered_df[nomination_col],
+            include_no=True
+        ).sum()
+    )
+    if nomination_col
+    else 0
+)
+
+
+pran_completion_pct = (
+    round(
+        (
+            (
+                unique_employee_count
+                - missing_pran_count
+            )
+            / unique_employee_count
+        )
+        * 100,
+        1
+    )
+    if unique_employee_count
+    else 0
+)
+
+
+nomination_completion_pct = (
+    round(
+        (
+            (
+                unique_employee_count
+                - missing_nomination_count
+            )
+            / unique_employee_count
+        )
+        * 100,
+        1
+    )
+    if unique_employee_count
+    else 0
+)
+
+
+# =========================================================
+# DUPLICATE UIN METRIC
+# =========================================================
+
+if uin_col:
+
+    dashboard_uin = (
+        filtered_df[uin_col]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    duplicate_mask = (
+        dashboard_uin.ne("")
+        &
+        dashboard_uin.duplicated(
+            keep=False
+        )
+    )
+
+    duplicate_uin_unique_count = int(
+        dashboard_uin[
+            duplicate_mask
+        ].nunique()
+    )
+
+else:
+
+    duplicate_uin_unique_count = 0
+
+
+pending_pct = (
+    round(
+        (
+            pending_count
+            / unique_employee_count
+        )
+        * 100,
+        1
+    )
+    if unique_employee_count
+    else 0
+)
+
+
+completed_pct = (
+    round(
+        (
+            completed_count
+            / unique_employee_count
+        )
+        * 100,
+        1
+    )
+    if unique_employee_count
+    else 0
+)
+
+
+# =========================================================
+# DASHBOARD CARDS
+# =========================================================
+
+card_data = [
+
+    (
+        "Total Records",
+        f"{total_records:,}",
+        "dashboard-blue"
+    ),
+
+    (
+        "Unique Employees",
+        f"{unique_employee_count:,}",
+        "dashboard-purple"
+    ),
+
+    (
+        "Pending",
+        f"{pending_count:,}",
+        "dashboard-orange"
+    ),
+
+    (
+        "Completed",
+        f"{completed_count:,}",
+        "dashboard-green"
+    ),
+
+    (
+        "Missing PRAN",
+        f"{missing_pran_count:,}",
+        "dashboard-red"
+    ),
+
+    (
+        "PRAN Completion",
+        f"{pran_completion_pct:.1f}%",
+        "dashboard-teal"
+    ),
+
+    (
+        "Missing Nomination",
+        f"{missing_nomination_count:,}",
+        "dashboard-pink"
+    ),
+
+    (
+        "Nomination Completion",
+        f"{nomination_completion_pct:.1f}%",
+        "dashboard-blue"
+    ),
+
+    (
+        "Duplicate UIN",
+        f"{duplicate_uin_unique_count:,}",
+        "dashboard-red"
+    ),
+
+    (
+        "Total Contribution",
+        f"INR {total_amount:,.0f}",
+        "dashboard-teal"
+    )
+]
+
+
+card_html = ""
+
+for label, value, tone in card_data:
+
+    card_html += f"""
+    <div class="dashboard-card {tone}">
+        <div class="dashboard-top">
+            <span class="dashboard-dot"></span>
+            <span class="dashboard-label">
+                {label}
+            </span>
+        </div>
+
+        <div class="dashboard-value">
+            {value}
+        </div>
+    </div>
+    """
+
+
+st.markdown(
+    f"""
+    <div class="dashboard-grid">
+        {card_html}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================================================
+# DASHBOARD CHARTS
+# =========================================================
+
+st.markdown(
+    "### Dashboard Charts"
+)
+
+chart_col1, chart_col2 = st.columns(2)
+
+
+# ---------------- BN CHART ----------------
+
+with chart_col1:
+
+    st.markdown(
+        "**BN-wise Employee Count**"
+    )
+
+    if bn_col:
+
+        bn_chart_values = (
+            master_filtered_df[bn_col]
+            .astype("string")
+            .str.strip()
+        )
+
+        bn_chart_values = (
+            bn_chart_values.mask(
+                bn_chart_values
+                .str.casefold()
+                .isin([
+                    "",
+                    "none",
+                    "nan",
+                    "null",
+                    "n/a",
+                    "na"
+                ]),
+                "Blank BN"
+            )
+        )
+
+        bn_chart = (
+            bn_chart_values
+            .fillna("Blank BN")
+            .value_counts()
+            .rename_axis("BN")
+            .reset_index(
+                name="Employees"
+            )
+            .set_index("BN")
+        )
+
+        if not bn_chart.empty:
+
+            st.bar_chart(
+                bn_chart,
+                use_container_width=True
+            )
+
+        else:
+
+            st.info(
+                "No BN data available."
+            )
+
+    else:
+
+        st.info(
+            "BN column not found."
+        )
+
+
+# ---------------- STATUS CHART ----------------
+
+with chart_col2:
+
+    st.markdown(
+        "**Case Status**"
+    )
+
+    if status_col:
+
+        status_chart_values = (
+            master_filtered_df[status_col]
+            .astype("string")
+            .str.strip()
+        )
+
+        status_chart_values = (
+            status_chart_values.mask(
+                status_chart_values
+                .str.casefold()
+                .isin([
+                    "",
+                    "none",
+                    "nan",
+                    "null",
+                    "n/a",
+                    "na"
+                ]),
+                "Blank"
+            )
+        )
+
+        status_chart = (
+            status_chart_values
+            .fillna("Blank")
+            .value_counts()
+            .rename_axis("Status")
+            .reset_index(
+                name="Employees"
+            )
+            .set_index("Status")
+        )
+
+        if not status_chart.empty:
+
+            st.bar_chart(
+                status_chart,
+                use_container_width=True
+            )
+
+        else:
+
+            st.info(
+                "No status data available."
+            )
+
+    else:
+
+        st.info(
+            "Case Status column not found."
+        )
+
+
+# =========================================================
+# BN SUMMARY
+# =========================================================
+
+bn_summary = pd.DataFrame()
+
+if bn_col:
+
+    st.subheader(
+        "BN-wise Summary"
+    )
+
+    bn_summary = build_bn_summary(
+        master_filtered_df,
+        bn_col,
+        status_col,
+        amount_col,
+        pran_col,
+        nomination_col,
+        uin_col
+    )
+
+    st.dataframe(
+        bn_summary,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# =========================================================
+# CASE STATUS SUMMARY
+# =========================================================
+
+status_summary = pd.DataFrame()
+
+if status_col:
+
+    st.subheader(
+        "Case Status Summary"
+    )
+
+    status_summary = (
+        master_filtered_df[
+            status_col
+        ]
+        .fillna("Blank")
+        .astype(str)
+        .value_counts()
+        .reset_index()
+    )
+
+    status_summary.columns = [
+        "Case Status",
+        "Total"
+    ]
+
+    st.dataframe(
+        status_summary,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.caption(
+        f"Pending rate: "
+        f"{pending_pct:.1f}% | "
+        f"Completed rate: "
+        f"{completed_pct:.1f}%"
+    )
+
+
+# =========================================================
+# EMPLOYEE REPORT
+# =========================================================
+
+st.subheader(
+    "Employee-wise Report"
+)
+
+employee_report = (
+    master_filtered_df.copy()
+)
+
+st.write(
+    "Total Unique Employees: "
+    f"**{len(employee_report):,}**"
+)
+
+if not employee_report.empty:
+
+    st.dataframe(
+        employee_report,
+        use_container_width=True,
+        hide_index=True,
+        height=400
+    )
+
+    employee_excel = make_excel(
+        employee_report,
+        "Employee Report"
+    )
+
+    st.download_button(
+        "Download Employee Excel Report",
+        data=employee_excel,
+        file_name="Employee_Wise_Report.xlsx",
+        mime=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+        key="download_employee_report"
+    )
+
+else:
+
+    st.info(
+        "No employee records found."
+    )
+
+
+# =========================================================
+# DUPLICATE UIN REPORT
+# IMPORTANT: RAW FILTERED DATA USED HERE
+# =========================================================
+
+duplicate_uin_report = pd.DataFrame()
+
+if uin_col:
+
+    st.subheader(
+        "Duplicate UIN Report"
+    )
+
+    uin_data = (
+        filtered_df[uin_col]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    duplicate_mask = (
+        uin_data.ne("")
+        &
+        uin_data.duplicated(
+            keep=False
+        )
+    )
+
+    duplicate_uin_report = (
+        filtered_df.loc[
+            duplicate_mask
+        ].copy()
+    )
+
+    duplicate_uin_unique_count = int(
+        uin_data[
+            duplicate_mask
+        ].nunique()
+    )
+
+    if not duplicate_uin_report.empty:
+
+        st.warning(
+            "Duplicate UIN Records: "
+            f"{len(duplicate_uin_report)}"
+        )
+
+        st.dataframe(
+            duplicate_uin_report,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        duplicate_excel = make_excel(
+            duplicate_uin_report,
+            "Duplicate UIN"
+        )
+
+        st.download_button(
+            "Download Duplicate UIN Report",
+            data=duplicate_excel,
+            file_name="Duplicate_UIN_Report.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key="download_duplicate_uin"
+        )
+
+    else:
+
+        st.success(
+            "No duplicate UIN found."
+        )
+
+
+# =========================================================
+# MISSING PRAN
+# UNIQUE EMPLOYEE BASIS
+# =========================================================
+
+missing_pran_report = pd.DataFrame()
+
+if pran_col:
+
+    st.subheader(
+        "Missing PRAN Report"
+    )
+
+    missing_pran_mask = missing_mask(
+        employee_report[pran_col]
+    )
+
+    missing_pran_report = (
+        employee_report.loc[
+            missing_pran_mask
+        ].copy()
+    )
+
+    if not missing_pran_report.empty:
+
+        st.warning(
+            "Employees without PRAN: "
+            f"{len(missing_pran_report)}"
+        )
+
+        st.dataframe(
+            missing_pran_report,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        missing_pran_excel = make_excel(
+            missing_pran_report,
+            "Missing PRAN"
+        )
+
+        st.download_button(
+            "Download Missing PRAN Report",
+            data=missing_pran_excel,
+            file_name="Missing_PRAN_Report.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key="download_missing_pran"
+        )
+
+    else:
+
+        st.success(
+            "All employees have PRAN."
+        )
+
+
+# =========================================================
+# MISSING NOMINATION
+# UNIQUE EMPLOYEE BASIS
+# =========================================================
+
+missing_nomination_report = pd.DataFrame()
+
+if nomination_col:
+
+    st.subheader(
+        "Missing Nomination Report"
+    )
+
+    missing_nomination_mask = missing_mask(
+        employee_report[
+            nomination_col
+        ],
+        include_no=True
+    )
+
+    missing_nomination_report = (
+        employee_report.loc[
+            missing_nomination_mask
+        ].copy()
+    )
+
+    if not missing_nomination_report.empty:
+
+        st.warning(
+            "Employees with missing nomination: "
+            f"{len(missing_nomination_report)}"
+        )
+
+        st.dataframe(
+            missing_nomination_report,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        nomination_excel = make_excel(
+            missing_nomination_report,
+            "Missing Nomination"
+        )
+
+        st.download_button(
+            "Download Missing Nomination Report",
+            data=nomination_excel,
+            file_name="Missing_Nomination_Report.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key="download_missing_nomination"
+        )
+
+    else:
+
+        st.success(
+            "All employees have nomination."
+        )
+
+
+# =========================================================
+# BN REPORT
+# =========================================================
+
+if bn_col:
+
+    st.subheader(
+        "BN Report"
+    )
+
+    if st.button(
+        "Generate BN Report",
+        key="generate_bn_report"
+    ):
+
+        st.dataframe(
+            bn_summary,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        bn_excel = make_excel(
+            bn_summary,
+            "BN Report"
+        )
+
+        st.download_button(
+            "Download BN Report",
+            data=bn_excel,
+            file_name="BN_Report.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key="download_bn_report"
+        )
+
+
+# =========================================================
+# BN-WISE COMPLETE EXCEL
+# =========================================================
+
+if bn_col:
+
+    st.subheader(
+        "BN-wise Complete Excel Report"
+    )
+
+    st.write(
+        "One Excel file containing Summary, "
+        "BN Summary, Filtered Data and "
+        "separate sheets for each BN."
+    )
+
+    if st.button(
+        "Generate BN-wise Complete Excel Report",
+        key="generate_bn_complete_report"
+    ):
+
+        output = BytesIO()
+        used_names = set()
+
+        with pd.ExcelWriter(
+            output,
+            engine="openpyxl"
+        ) as writer:
+
+            summary_data = pd.DataFrame({
+
+                "Particular": [
+
+                    "Total Records",
+                    "Pending",
+                    "Completed",
+                    "Total Contribution",
+                    "Unique Employees",
+                    "Missing PRAN",
+                    "Missing Nomination",
+                    "Duplicate UIN Records",
+                    "Unique Duplicate UINs"
+                ],
+
+                "Value": [
+
+                    total_records,
+                    pending_count,
+                    completed_count,
+                    total_amount,
+                    unique_employee_count,
+                    len(missing_pran_report),
+                    len(missing_nomination_report),
+                    len(duplicate_uin_report),
+                    duplicate_uin_unique_count
+                ]
+            })
+
+            summary_data.to_excel(
+                writer,
+                index=False,
+                sheet_name="Summary"
+            )
+
+            format_excel_writer(
+                writer,
+                summary_data,
+                "Summary"
+            )
+
+            used_names.add(
+                "Summary"
+            )
+
+
+            bn_summary.to_excel(
+                writer,
+                index=False,
+                sheet_name="BN Summary"
+            )
+
+            format_excel_writer(
+                writer,
+                bn_summary,
+                "BN Summary"
+            )
+
+            used_names.add(
+                "BN Summary"
+            )
+
+
+            filtered_df.to_excel(
+                writer,
+                index=False,
+                sheet_name="Filtered Data"
+            )
+
+            format_excel_writer(
+                writer,
+                filtered_df,
+                "Filtered Data"
+            )
+
+            used_names.add(
+                "Filtered Data"
+            )
+
+
+            # UNIQUE DATA IN BN SHEETS
+            for bn_value, group in (
+                master_filtered_df.groupby(
+                    bn_col,
+                    dropna=False,
+                    sort=True
+                )
+            ):
+
+                bn_display = str(
+                    bn_value
+                ).strip()
+
+                if bn_display.casefold() in [
+                    "",
+                    "nan",
+                    "none"
+                ]:
+
+                    bn_display = "Blank BN"
+
+                sheet_name = safe_sheet_name(
+                    f"BN-{bn_display}",
+                    used_names
+                )
+
+                used_names.add(
+                    sheet_name
+                )
+
+                group.to_excel(
+                    writer,
+                    index=False,
+                    sheet_name=sheet_name
+                )
+
+                format_excel_writer(
+                    writer,
+                    group,
+                    sheet_name
+                )
+
+        output.seek(0)
+
+        st.success(
+            "BN-wise Complete Excel Report is ready."
+        )
+
+        st.download_button(
+            "Download BN-wise Complete Excel Report",
+            data=output.getvalue(),
+            file_name="BN_Wise_Complete_Report.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key="download_bn_complete_report"
+        )
+
+
+# =========================================================
+# COMPLETE MASTER REPORT
+# =========================================================
+
+st.subheader(
+    "Complete Master Report"
+)
+
+st.write(
+    "Generate all important reports "
+    "in a single Excel file."
+)
+
+if st.button(
+    "Generate Complete Master Report",
+    key="generate_master_report"
+):
+
+    output = BytesIO()
+
+    with pd.ExcelWriter(
+        output,
+        engine="openpyxl"
+    ) as writer:
+
+        # ---------------- SUMMARY ----------------
+
+        summary_data = pd.DataFrame({
+
+            "Particular": [
+
+                "Total Records",
+                "Pending",
+                "Completed",
+                "Total Contribution",
+                "Unique Employees",
+                "Missing PRAN",
+                "Missing Nomination",
+                "Duplicate UIN Records",
+                "Unique Duplicate UINs"
+            ],
+
+            "Value": [
+
+                total_records,
+                pending_count,
+                completed_count,
+                total_amount,
+                unique_employee_count,
+                len(missing_pran_report),
+                len(missing_nomination_report),
+                len(duplicate_uin_report),
+                duplicate_uin_unique_count
+            ]
+        })
+
+        summary_data.to_excel(
+            writer,
+            index=False,
+            sheet_name="Summary"
+        )
+
+        format_excel_writer(
+            writer,
+            summary_data,
+            "Summary"
+        )
+
+
+        # ---------------- BN SUMMARY ----------------
+
+        if bn_col:
+
+            bn_summary.to_excel(
+                writer,
+                index=False,
+                sheet_name="BN Summary"
+            )
+
+            format_excel_writer(
+                writer,
+                bn_summary,
+                "BN Summary"
+            )
+
+
+        # ---------------- EMPLOYEE MASTER ----------------
+
+        employee_report.to_excel(
+            writer,
+            index=False,
+            sheet_name="Employee Report"
+        )
+
+        format_excel_writer(
+            writer,
+            employee_report,
+            "Employee Report"
+        )
+
+
+        # ---------------- MISSING PRAN ----------------
+
+        missing_pran_report.to_excel(
+            writer,
+            index=False,
+            sheet_name="Missing PRAN"
+        )
+
+        format_excel_writer(
+            writer,
+            missing_pran_report,
+            "Missing PRAN"
+        )
+
+
+        # ---------------- MISSING NOMINATION ----------------
+
+        missing_nomination_report.to_excel(
+            writer,
+            index=False,
+            sheet_name="Missing Nomination"
+        )
+
+        format_excel_writer(
+            writer,
+            missing_nomination_report,
+            "Missing Nomination"
+        )
+
+
+        # ---------------- DUPLICATE UIN ----------------
+
+        duplicate_uin_report.to_excel(
+            writer,
+            index=False,
+            sheet_name="Duplicate UIN"
+        )
+
+        format_excel_writer(
+            writer,
+            duplicate_uin_report,
+            "Duplicate UIN"
+        )
+
+
+        # ---------------- CASE STATUS ----------------
+
+        if status_col:
+
+            status_summary.to_excel(
+                writer,
+                index=False,
+                sheet_name="Case Status"
+            )
+
+            format_excel_writer(
+                writer,
+                status_summary,
+                "Case Status"
+            )
+
+
+        # ---------------- FILTERED RAW DATA ----------------
+
+        filtered_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="Filtered Data"
+        )
+
+        format_excel_writer(
+            writer,
+            filtered_df,
+            "Filtered Data"
+        )
+
+
+        # ---------------- UNIQUE MASTER ----------------
+
+        master_filtered_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="Unique Employee Master"
+        )
+
+        format_excel_writer(
+            writer,
+            master_filtered_df,
+            "Unique Employee Master"
+        )
+
+
+    output.seek(0)
+
+    st.success(
+        "Complete Master Report is ready."
+    )
+
+    st.download_button(
+        "Download Complete Master Report",
+        data=output.getvalue(),
+        file_name="Complete_Master_Report.xlsx",
+        mime=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+        key="download_complete_master_report"
+    )
+
+
+# =========================================================
+# DATA PREVIEW
+# =========================================================
+
+st.subheader(
+    "Data Preview"
+)
+
+st.dataframe(
+    filtered_df,
+    use_container_width=True,
+    height=450
+)
+
+
+# =========================================================
+# FILTERED DOWNLOAD
+# =========================================================
+
+filtered_excel = make_excel(
+    filtered_df,
+    "Filtered Data"
+)
+
+st.download_button(
+    "Download Filtered Excel Report",
+    data=filtered_excel,
+    file_name="Filtered_Report.xlsx",
+    mime=(
+        "application/vnd.openxmlformats-officedocument."
+        "spreadsheetml.sheet"
+    ),
+    key="download_filtered_report"
+)
