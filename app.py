@@ -1073,7 +1073,7 @@ total_records = len(
 pending_count = (
     int(
         status_mask(
-            filtered_df,
+            master_filtered_df,
             status_col,
             "pending"
         ).sum()
@@ -1084,7 +1084,7 @@ pending_count = (
 completed_count = (
     int(
         status_mask(
-            filtered_df,
+            master_filtered_df,
             status_col,
             "complete|completed|done"
         ).sum()
