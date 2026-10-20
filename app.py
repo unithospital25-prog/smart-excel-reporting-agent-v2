@@ -1366,11 +1366,11 @@ with chart_col1:
     )
 
     if bn_col:
-        bn_chart_values = (
-             master_filtered_df[bn_col]
-            .astype("string")
-            .str.strip()
-        )
+       bn_chart_values = (
+        master_filtered_df[bn_col]
+        .astype("string")
+        .str.strip()
+    )
         bn_chart_values = bn_chart_values.mask(
             bn_chart_values.str.casefold().isin(
                 ["", "none", "nan", "null", "n/a", "na"]
