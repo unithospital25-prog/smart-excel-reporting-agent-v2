@@ -1566,7 +1566,7 @@ st.subheader(
     "Employee-wise Report"
 )
 
-employee_report = filtered_df.copy()
+employee_report = master_filtered_df.copy()
 
 st.write(
     f"Total Unique Employees: "
