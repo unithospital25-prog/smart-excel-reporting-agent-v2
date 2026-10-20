@@ -1100,35 +1100,15 @@ total_amount = (
     if amount_col else 0
 )
 
-if uin_col:
-    unique_employee_count = (
-        filtered_df[uin_col]
-        .dropna()
-        .astype(str)
-        .str.strip()
-        .replace("", pd.NA)
-        .dropna()
-        .nunique()
-    )
-elif employee_name_col:
-    unique_employee_count = (
-        filtered_df[employee_name_col]
-        .dropna()
-        .astype(str)
-        .str.strip()
-        .replace("", pd.NA)
-        .dropna()
-        .nunique()
-    )
+if not master_filtered_df.empty:
+    unique_employee_count = len(master_filtered_df)
 else:
-    unique_employee_count = len(
-        filtered_df
-    )
+    unique_employee_count = 0
 
 missing_pran_count = (
     int(
         missing_mask(
-            filtered_df[pran_col]
+            master_filtered_df[pran_col]
         ).sum()
     )
     if pran_col else 0
@@ -1137,7 +1117,7 @@ missing_pran_count = (
 missing_nomination_count = (
     int(
         missing_mask(
-            filtered_df[nomination_col],
+            master_filtered_df[nomination_col]
             include_no=True
         ).sum()
     )
@@ -1147,23 +1127,23 @@ missing_nomination_count = (
 pran_completion_pct = (
     round(
         (
-            (total_records - missing_pran_count)
-            / total_records
+            (unique_employee_count - missing_pran_count)
+            / unique_employee_count
         ) * 100,
         1
     )
-    if total_records else 0
+    if unique_employee_count else 0
 )
 
 nomination_completion_pct = (
     round(
         (
-            (total_records - missing_nomination_count)
-            / total_records
+            (unique_employee_count - missing_nomination_count)
+            / unique_employee_count
         ) * 100,
         1
     )
-    if total_records else 0
+   if unique_employee_count else 0 
 )
 
 if uin_col:
@@ -1191,10 +1171,10 @@ else:
 
 pending_pct = (
     round(
-        (pending_count / total_records) * 100,
+        (pending_count / unique_employee_count) * 100,
         1
     )
-    if total_records else 0
+    if unique_employee_count else 0
 )
 
 card_data = [
@@ -1209,15 +1189,15 @@ card_data = [
         "dashboard-purple"
     ),
     (
-        "Pending",
-        f"{pending_count:,}",
-        "dashboard-orange"
-    ),
-    (
-        "Completed",
-        f"{completed_count:,}",
-        "dashboard-green"
-    ),
+    "Pending",
+    f"{pending_count:,}",
+    "dashboard-orange"
+),
+(
+    "Completed",
+    f"{completed_count:,}",
+    "dashboard-green"
+),
     (
         "Missing PRAN",
         f"{missing_pran_count:,}",
@@ -1387,7 +1367,7 @@ with chart_col1:
 
     if bn_col:
         bn_chart_values = (
-            filtered_df[bn_col]
+             master_filtered_df[bn_col]
             .astype("string")
             .str.strip()
         )
