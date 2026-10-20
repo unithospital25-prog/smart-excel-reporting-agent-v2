@@ -744,9 +744,11 @@ nomination_col = find_column(
         "nominee status"
     }
 )
-# =========================================================
+# ============================================================
 # FINAL VALID RECORD FILTER
-# =========================================================# 
+# REMOVE BLANK / NONE ROWS AFTER MULTI-FILE COMBINE
+# ============================================================
+
 record_columns = [
     uin_col,
     employee_name_col,
@@ -757,15 +759,18 @@ record_columns = [
     amount_col
 ]
 
+# Keep only columns that actually exist in dataframe
 record_columns = [
     col for col in record_columns
-    if col and col in df.columns
+    if col is not None and col in df.columns
 ]
 
 if record_columns:
+
     record_check = pd.DataFrame(index=df.index)
 
     for col in record_columns:
+
         values = (
             df[col]
             .astype("string")
@@ -788,9 +793,13 @@ if record_columns:
             ])
         )
 
+    # Keep row only when at least ONE real business-data
+    # field contains meaningful information
     valid_record_mask = record_check.any(axis=1)
 
     df = df.loc[valid_record_mask].copy()
+
+    # Re-number rows after removing blank rows
     df.reset_index(drop=True, inplace=True)
 # =========================================================
 # SEARCH & FILTER
