@@ -1094,7 +1094,7 @@ completed_count = (
 
 total_amount = (
     pd.to_numeric(
-        filtered_df[amount_col],
+        master_filtered_df[amount_col],
         errors="coerce"
     ).fillna(0).sum()
     if amount_col else 0
