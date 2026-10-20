@@ -1006,7 +1006,59 @@ if status_col:
             filtered_df[status_col].astype(str)
             == selected_status
         ].copy()
+# =========================================================
+# UNIQUE EMPLOYEE MASTER VIEW
+# =========================================================
 
+st.subheader("Unique Employee Master")
+
+st.caption(
+    "One unique record per UIN. "
+    "Duplicate UIN records remain available in the Duplicate UIN Report."
+)
+
+master_filtered_df = master_df.copy()
+
+# Apply the same BN filter
+if bn_col and "selected_bn" in locals():
+    if selected_bn != "All":
+        master_filtered_df = master_filtered_df[
+            master_filtered_df[bn_col].astype(str) == selected_bn
+        ].copy()
+
+# Apply the same Status filter
+if status_col and "selected_status" in locals():
+    if selected_status != "All":
+        master_filtered_df = master_filtered_df[
+            master_filtered_df[status_col].astype(str) == selected_status
+        ].copy()
+
+st.info(
+    f"Unique Employee Master: {len(master_filtered_df):,} employee(s)"
+)
+
+st.dataframe(
+    master_filtered_df,
+    use_container_width=True,
+    hide_index=True,
+    height=400
+)
+
+master_excel = make_excel(
+    master_filtered_df,
+    "Employee Master"
+)
+
+st.download_button(
+    "Download Unique Employee Master",
+    data=master_excel,
+    file_name="Unique_Employee_Master.xlsx",
+    mime=(
+        "application/vnd.openxmlformats-officedocument."
+        "spreadsheetml.sheet"
+    ),
+    key="download_unique_employee_master"
+)
 # =========================================================
 # DASHBOARD V5
 # =========================================================
