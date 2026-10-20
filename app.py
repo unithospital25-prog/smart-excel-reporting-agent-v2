@@ -746,7 +746,52 @@ nomination_col = find_column(
 )
 # =========================================================
 # FINAL VALID RECORD FILTER
-# =========================================================
+# =========================================================# 
+record_columns = [
+    uin_col,
+    employee_name_col,
+    bn_col,
+    pran_col,
+    nomination_col,
+    status_col,
+    amount_col
+]
+
+record_columns = [
+    col for col in record_columns
+    if col and col in df.columns
+]
+
+if record_columns:
+    record_check = pd.DataFrame(index=df.index)
+
+    for col in record_columns:
+        values = (
+            df[col]
+            .astype("string")
+            .str.replace("\u00a0", " ", regex=False)
+            .str.strip()
+            .str.casefold()
+        )
+
+        record_check[col] = (
+            values.notna()
+            & ~values.isin([
+                "",
+                "none",
+                "nan",
+                "null",
+                "n/a",
+                "na",
+                "nat",
+                "-"
+            ])
+        )
+
+    valid_record_mask = record_check.any(axis=1)
+
+    df = df.loc[valid_record_mask].copy()
+    df.reset_index(drop=True, inplace=True)
 # =========================================================
 # SEARCH & FILTER
 # =========================================================
