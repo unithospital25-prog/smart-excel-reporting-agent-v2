@@ -245,8 +245,7 @@ def normalize_columns(columns):
 
     result = []
     used = {}
-
-        preferred_names = {
+    preferred_names = {
         # UIN / Employee Number
         "uin": "UIN",
         "employee_number": "UIN",
