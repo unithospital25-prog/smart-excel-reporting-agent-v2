@@ -901,6 +901,34 @@ df.reset_index(
     inplace=True
 )
 # =========================================================
+# UNIQUE EMPLOYEE MASTER
+# =========================================================
+
+raw_df = df.copy()
+
+if uin_col:
+    uin_clean = (
+        raw_df[uin_col]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    valid_uin_mask = uin_clean.ne("")
+
+    master_df = raw_df.loc[valid_uin_mask].copy()
+
+    # Keep one record per UIN
+    master_df = master_df.drop_duplicates(
+        subset=[uin_col],
+        keep="first"
+    ).reset_index(drop=True)
+
+else:
+    master_df = raw_df.drop_duplicates(
+        keep="first"
+    ).reset_index(drop=True)
+# =========================================================
 # SEARCH & FILTER
 # =========================================================
 st.subheader(
