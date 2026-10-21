@@ -1,17 +1,13 @@
 import streamlit as st
 import pandas as pd
 import re
-import logging
 from io import BytesIO
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # =========================================================
 # PAGE CONFIG
 # =========================================================
 st.set_page_config(
-    page_title="Smart Excel Reporting Agent V5",
+    page_title="Smart Excel Reporting Agent",
     page_icon="X",
     layout="wide"
 )
@@ -31,104 +27,70 @@ st.markdown("""
     color: #6b7280;
     margin-bottom: 20px;
 }
-
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
-    gap: 12px;
-    width: 100%;
-    margin: 8px 0 26px 0;
-}
-
-.dashboard-card {
-    box-sizing: border-box;
-    min-height: 104px;
-    padding: 15px;
-    border: 1px solid rgba(148,163,184,0.28);
-    border-radius: 14px;
-    background: linear-gradient(
-        145deg,
-        rgba(255,255,255,0.075),
-        rgba(255,255,255,0.025)
-    );
-    box-shadow: 0 5px 18px rgba(0,0,0,0.12);
-}
-
-.dashboard-top {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.dashboard-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: currentColor;
-}
-
-.dashboard-label {
+.dashboard-note {
     font-size: 13px;
-    font-weight: 600;
-    color: #a7afbd;
-}
-
-.dashboard-value {
-    margin-top: 10px;
-    font-size: 30px;
-    font-weight: 800;
-    color: #f8fafc;
-}
-
-.dashboard-blue { color: #60a5fa; }
-.dashboard-purple { color: #a78bfa; }
-.dashboard-orange { color: #f59e0b; }
-.dashboard-green { color: #4ade80; }
-.dashboard-red { color: #f87171; }
-.dashboard-pink { color: #f472b6; }
-.dashboard-teal { color: #2dd4bf; }
-
-@media (max-width: 520px) {
-    .dashboard-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 9px;
-    }
-
-    .dashboard-card {
-        min-height: 88px;
-        padding: 11px;
-    }
-
-    .dashboard-label {
-        font-size: 11px;
-    }
-
-    .dashboard-value {
-        font-size: 22px;
-    }
+    color: #6b7280;
+    margin-top: -8px;
+    margin-bottom: 10px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown(
-    '<div class="main-title">Smart Excel Reporting Agent V5</div>',
+    '<div class="main-title">Smart Excel Reporting Agent</div>',
     unsafe_allow_html=True
 )
-
 st.markdown(
-    '<div class="sub-title">'
-    'Upload, analyze and generate smart Excel reports - single or multiple files.'
-    '</div>',
+    '<div class="sub-title">Upload and analyze your Excel data - single or multiple files.</div>',
     unsafe_allow_html=True
 )
 
 
 # =========================================================
-# EXCEL FUNCTIONS
+# HELPERS
 # =========================================================
+def make_excel(dataframe, sheet_name="Report"):
+    output = BytesIO()
+
+    safe_df = dataframe.copy()
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        safe_df.to_excel(
+            writer,
+            index=False,
+            sheet_name=safe_sheet_name(sheet_name)
+        )
+        format_excel_writer(
+            writer,
+            safe_df,
+            safe_sheet_name(sheet_name)
+        )
+
+    output.seek(0)
+    return output.getvalue()
+
+
+def safe_sheet_name(name, used_names=None):
+    name = str(name)
+    name = re.sub(r'[\[\]\:\*\?\/\\]', '_', name)
+    name = name[:31] or "Sheet"
+
+    if used_names is None:
+        return name
+
+    original = name
+    counter = 1
+
+    while name in used_names:
+        suffix = f"_{counter}"
+        name = original[:31 - len(suffix)] + suffix
+        counter += 1
+
+    return name
+
 
 def format_excel_writer(writer, dataframe, sheet_name):
-
+    """Official Excel formatting with automatic column widths."""
     try:
         from openpyxl.styles import (
             Font,
@@ -138,6 +100,7 @@ def format_excel_writer(writer, dataframe, sheet_name):
             Side
         )
         from openpyxl.utils import get_column_letter
+        from openpyxl.worksheet.table import Table, TableStyleInfo
 
         ws = writer.book[sheet_name]
 
@@ -155,40 +118,49 @@ def format_excel_writer(writer, dataframe, sheet_name):
 
         body_font = Font(
             name="Aptos",
-            size=10
+            size=10,
+            color="000000"
         )
 
-        border = Border(
+        thin_border = Border(
             left=Side(style="thin", color="D9E1F2"),
             right=Side(style="thin", color="D9E1F2"),
             top=Side(style="thin", color="D9E1F2"),
             bottom=Side(style="thin", color="D9E1F2")
         )
 
-        for cell in ws[1]:
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(
-                horizontal="center",
-                vertical="center",
-                wrap_text=True
-            )
-            cell.border = border
-
-        ws.row_dimensions[1].height = 28
-        ws.freeze_panes = "A2"
-        ws.auto_filter.ref = ws.dimensions
-
-        for row in ws.iter_rows(min_row=2):
-
-            for cell in row:
-                cell.font = body_font
+        # Header
+        if ws.max_row >= 1:
+            for cell in ws[1]:
+                cell.fill = header_fill
+                cell.font = header_font
                 cell.alignment = Alignment(
-                    vertical="center"
+                    horizontal="center",
+                    vertical="center",
+                    wrap_text=True
                 )
-                cell.border = border
+                cell.border = thin_border
 
-        for col_idx, cells in enumerate(
+            ws.row_dimensions[1].height = 28
+
+        # Body
+        if ws.max_row >= 2:
+            for row in ws.iter_rows(min_row=2):
+                for cell in row:
+                    cell.font = body_font
+                    cell.alignment = Alignment(
+                        vertical="center",
+                        wrap_text=False
+                    )
+                    cell.border = thin_border
+
+        # Freeze and filter
+        if ws.max_row >= 1 and ws.max_column >= 1:
+            ws.freeze_panes = "A2"
+            ws.auto_filter.ref = ws.dimensions
+
+        # Automatic column width
+        for col_idx, column_cells in enumerate(
             ws.iter_cols(
                 min_row=1,
                 max_row=ws.max_row,
@@ -197,356 +169,373 @@ def format_excel_writer(writer, dataframe, sheet_name):
             ),
             start=1
         ):
-
             max_length = 0
 
-            for cell in cells:
+            for cell in column_cells:
                 value = "" if cell.value is None else str(cell.value)
                 max_length = max(max_length, len(value))
 
+            width = min(max(max_length + 3, 12), 35)
+
             ws.column_dimensions[
                 get_column_letter(col_idx)
-            ].width = min(
-                max(max_length + 3, 12),
-                35
-            )
+            ].width = width
 
-    except Exception as e:
+        # Date / amount formatting
+        for col_idx, col_name in enumerate(dataframe.columns, start=1):
+            lower_name = str(col_name).strip().casefold()
 
-        logger.warning(
-            "Excel formatting failed: %s",
-            e
-        )
-
-
-def make_excel(dataframe, sheet_name="Report"):
-
-    output = BytesIO()
-
-    with pd.ExcelWriter(
-        output,
-        engine="openpyxl"
-    ) as writer:
-
-        dataframe.to_excel(
-            writer,
-            index=False,
-            sheet_name=sheet_name
-        )
-
-        format_excel_writer(
-            writer,
-            dataframe,
-            sheet_name
-        )
-
-    output.seek(0)
-
-    return output.getvalue()
-
-
-def safe_sheet_name(name, used_names=None):
-
-    name = str(name)
-
-    name = re.sub(
-        r'[\[\]\:\*\?\/\\]',
-        "_",
-        name
-    )
-
-    name = name[:31] or "Sheet"
-
-    if used_names is None:
-        return name
-
-    original = name
-    counter = 1
-
-    while name in used_names:
-
-        suffix = f"_{counter}"
-
-        name = (
-            original[:31 - len(suffix)]
-            + suffix
-        )
-
-        counter += 1
-
-    return name
-
-
-# =========================================================
-# CLEANING
-# =========================================================
-
-def clean_empty_rows(
-    dataframe,
-    exclude_columns=None
-):
-
-    if dataframe is None or dataframe.empty:
-        return dataframe
-
-    df_clean = dataframe.copy()
-
-    if exclude_columns is None:
-        exclude_columns = []
-
-    fake_empty_values = {
-        "",
-        "none",
-        "nan",
-        "null",
-        "n/a",
-        "na",
-        "nat",
-        "-"
-    }
-
-    for col in df_clean.columns:
-
-        if col in exclude_columns:
-            continue
-
-        if (
-            pd.api.types.is_object_dtype(df_clean[col])
-            or
-            pd.api.types.is_string_dtype(df_clean[col])
-        ):
-
-            text = (
-                df_clean[col]
-                .astype("string")
-                .str.replace(
-                    "\u00a0",
-                    " ",
-                    regex=False
+            for row_idx in range(2, ws.max_row + 1):
+                cell = ws.cell(
+                    row=row_idx,
+                    column=col_idx
                 )
-                .str.strip()
-            )
 
-            blank_mask = (
-                text.str.casefold()
-                .isin(fake_empty_values)
-            )
+                if "date" in lower_name:
+                    cell.number_format = "dd-mm-yyyy"
 
-            df_clean[col] = text.mask(
-                blank_mask,
-                pd.NA
-            )
+                if (
+                    "amount" in lower_name
+                    or "contribution" in lower_name
+                    or (
+                        "total" in lower_name
+                        and "amount" in lower_name
+                    )
+                ):
+                    if isinstance(cell.value, (int, float)):
+                        cell.number_format = '#,##0.00'
 
-    data_columns = [
-        col
-        for col in df_clean.columns
-        if col not in exclude_columns
-    ]
+        # Add Excel table only for normal one-header-row sheets.
+        if ws.max_row >= 2 and ws.max_column >= 1:
+            table_name = re.sub(
+                r"[^A-Za-z0-9_]",
+                "",
+                f"Table_{sheet_name}"
+            )[:200]
 
-    if data_columns:
+            if not table_name or table_name[0].isdigit():
+                table_name = "Table_Report"
 
-        meaningful_mask = (
-            df_clean[data_columns]
-            .notna()
-            .any(axis=1)
+            try:
+                tab = Table(
+                    displayName=table_name,
+                    ref=ws.dimensions
+                )
+
+                style = TableStyleInfo(
+                    name="TableStyleMedium2",
+                    showFirstColumn=False,
+                    showLastColumn=False,
+                    showRowStripes=True,
+                    showColumnStripes=False
+                )
+
+                tab.tableStyleInfo = style
+                ws.add_table(tab)
+            except Exception:
+                pass
+
+    except Exception:
+        pass
+
+
+def format_excel_section(
+    ws,
+    header_row,
+    start_row,
+    end_row,
+    start_col=1,
+    end_col=None
+):
+    """Format a separate Excel data section without creating a table."""
+    try:
+        from openpyxl.styles import (
+            Font,
+            PatternFill,
+            Alignment,
+            Border,
+            Side
+        )
+        from openpyxl.utils import get_column_letter
+
+        if end_col is None:
+            end_col = ws.max_column
+
+        header_fill = PatternFill(
+            fill_type="solid",
+            fgColor="1F4E78"
         )
 
-        df_clean = df_clean.loc[
-            meaningful_mask
-        ].copy()
+        header_font = Font(
+            name="Aptos",
+            size=11,
+            bold=True,
+            color="FFFFFF"
+        )
 
-    return df_clean.reset_index(
-        drop=True
-    )
+        body_font = Font(
+            name="Aptos",
+            size=10,
+            color="000000"
+        )
 
+        thin_border = Border(
+            left=Side(style="thin", color="D9E1F2"),
+            right=Side(style="thin", color="D9E1F2"),
+            top=Side(style="thin", color="D9E1F2"),
+            bottom=Side(style="thin", color="D9E1F2")
+        )
 
-# =========================================================
-# COLUMN NORMALIZATION
-# =========================================================
+        # Header
+        for col in range(start_col, end_col + 1):
+            cell = ws.cell(
+                row=header_row,
+                column=col
+            )
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(
+                horizontal="center",
+                vertical="center",
+                wrap_text=True
+            )
+            cell.border = thin_border
+
+        ws.row_dimensions[header_row].height = 28
+
+        # Body
+        for row in range(start_row, end_row + 1):
+            for col in range(start_col, end_col + 1):
+                cell = ws.cell(
+                    row=row,
+                    column=col
+                )
+                cell.font = body_font
+                cell.alignment = Alignment(
+                    vertical="center",
+                    wrap_text=False
+                )
+                cell.border = thin_border
+
+        # Width
+        for col in range(start_col, end_col + 1):
+            max_len = 0
+
+            for row in range(header_row, end_row + 1):
+                value = ws.cell(
+                    row=row,
+                    column=col
+                ).value
+
+                max_len = max(
+                    max_len,
+                    len(str(value)) if value is not None else 0
+                )
+
+            ws.column_dimensions[
+                get_column_letter(col)
+            ].width = min(max(max_len + 3, 12), 35)
+
+    except Exception:
+        pass
+
 
 def normalize_column_key(value):
-
-    text = (
-        str(value)
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
-
-    text = re.sub(
-        r"\s+",
-        " ",
-        text
-    ).strip().casefold()
-
-    text = re.sub(
-        r"[^a-z0-9]+",
-        "_",
-        text
-    ).strip("_")
-
+    """Create a stable key for matching Excel headings."""
+    text = str(value)
+    text = text.replace("\n", " ").replace("\r", " ")
+    text = re.sub(r"\s+", " ", text).strip().casefold()
+    text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
     return text
 
 
 def normalize_columns(columns):
+    """Normalize different Excel headings to common master headings."""
+    result = []
+    used = {}
 
     preferred_names = {
-
+        # UIN / employee number
         "uin": "UIN",
         "employee_number": "UIN",
         "employee_no": "UIN",
         "employee_id": "UIN",
         "employee_code": "UIN",
 
+        # Employee name
         "employee_name": "Employee Name",
         "name": "Employee Name",
         "employee": "Employee Name",
 
+        # BN / Battalion / Unit
         "bn": "BN",
         "battalion": "BN",
         "battalion_no": "BN",
-        "bn_no": "BN",
+        "battalion_number": "BN",
         "unit": "BN",
+        "unit_name": "BN",
 
-        "pran": "PRAN",
-        "pran_no": "PRAN",
-        "pran_number": "PRAN",
-        "pran_num": "PRAN",
+        # PRAN
+        "pran": "PRAN No",
+        "pran_no": "PRAN No",
+        "pran_number": "PRAN No",
+        "pran_no_": "PRAN No",
 
+        # Status
         "status": "Status",
-        "case_status": "Status",
+        "case_status": "Case Status",
 
+        # Amount / contribution
         "amount": "Amount",
-        "contribution": "Amount",
-        "total_amount": "Amount",
+        "contribution": "Contribution",
+        "total_amount": "Total Amount",
 
+        # Nomination
         "nomination": "Nomination",
-        "nomination_status": "Nomination",
-        "nominee": "Nomination",
-        "nominee_status": "Nomination",
+        "nomination_status": "Nomination Status",
+        "nominee": "Nominee",
+        "nominee_status": "Nominee Status",
 
-        "mobile": "Mobile",
-        "mobile_no": "Mobile"
+        # Mobile
+        "mobile": "Mobile No",
+        "mobile_no": "Mobile No",
+        "mobile_number": "Mobile No",
+        "phone": "Mobile No",
+        "phone_no": "Mobile No"
     }
 
-    result = []
-    used = {}
-
     for original in columns:
-
-        original_text = str(
-            original
-        ).strip()
-
-        key = normalize_column_key(
-            original_text
-        )
+        original_text = str(original).strip()
+        key = normalize_column_key(original_text)
 
         base_name = preferred_names.get(
             key,
             original_text
         )
 
-        if not base_name:
+        if base_name == "":
             base_name = "Unnamed Column"
 
         if base_name in used:
-
             used[base_name] += 1
-
             final_name = (
                 f"{base_name}_{used[base_name]}"
             )
-
         else:
-
             used[base_name] = 1
-
             final_name = base_name
 
-        result.append(
-            final_name
-        )
+        result.append(final_name)
 
     return result
 
 
-def find_column(
-    columns,
-    possible_names
-):
+def merge_duplicate_master_columns(dataframe):
+    """Merge duplicate canonical columns safely."""
+    df_local = dataframe.copy()
 
-    exact = {
-        str(x).strip().casefold(): x
-        for x in columns
-    }
+    groups = {}
 
+    for idx, col in enumerate(df_local.columns):
+        base = str(col).strip()
+
+        if re.match(r"^(.+)_\d+$", base):
+            base_name = re.sub(r"_\d+$", "", base)
+        else:
+            base_name = base
+
+        groups.setdefault(base_name, []).append(idx)
+
+    # Rebuild columns positionally to avoid pandas duplicate-label issues.
+    columns_to_drop = []
+
+    for base_name, positions in groups.items():
+        if len(positions) <= 1:
+            continue
+
+        combined = pd.Series(
+            pd.NA,
+            index=df_local.index,
+            dtype="object"
+        )
+
+        for pos in positions:
+            series = df_local.iloc[:, pos].copy()
+
+            clean = series.replace(
+                {
+                    "": pd.NA,
+                    "None": pd.NA,
+                    "none": pd.NA,
+                    "nan": pd.NA,
+                    "NaN": pd.NA,
+                    "null": pd.NA,
+                    "NULL": pd.NA
+                }
+            )
+
+            combined = combined.fillna(clean)
+
+        first_pos = positions[0]
+        df_local.iloc[:, first_pos] = combined
+
+        columns_to_drop.extend(
+            positions[1:]
+        )
+
+    if columns_to_drop:
+        keep_positions = [
+            idx
+            for idx in range(len(df_local.columns))
+            if idx not in set(columns_to_drop)
+        ]
+
+        df_local = df_local.iloc[
+            :,
+            keep_positions
+        ].copy()
+
+    return df_local
+
+
+def find_column(columns, possible_names):
     normalized = {
         normalize_column_key(x): x
         for x in columns
     }
 
     for possible in possible_names:
-
-        key = str(
-            possible
-        ).strip().casefold()
-
-        if key in exact:
-            return exact[key]
-
-    for possible in possible_names:
-
-        key = normalize_column_key(
-            possible
-        )
+        key = normalize_column_key(possible)
 
         if key in normalized:
             return normalized[key]
 
-    candidates = []
-
-    aliases = [
-        normalize_column_key(x)
-        for x in possible_names
-    ]
-
-    for col in columns:
-
-        col_key = normalize_column_key(
-            col
-        )
-
-        for alias in aliases:
-
-            if alias and (
-                col_key.startswith(
-                    alias + "_"
-                )
-                or
-                col_key.endswith(
-                    "_" + alias
-                )
-            ):
-
-                candidates.append(col)
-                break
-
-    candidates = list(
-        dict.fromkeys(candidates)
-    )
-
-    if len(candidates) == 1:
-        return candidates[0]
-
     return None
 
 
-# =========================================================
-# STATUS / MISSING FUNCTIONS
-# =========================================================
+def status_mask(dataframe, status_col, pattern):
+    if not status_col or status_col not in dataframe.columns:
+        return pd.Series(
+            False,
+            index=dataframe.index
+        )
 
-def classify_status(series):
+    status_data = (
+        dataframe[status_col]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.casefold()
+    )
 
+    return status_data.str.contains(
+        pattern,
+        regex=True,
+        na=False
+    )
+
+
+def missing_mask(series, include_no=False):
     data = (
         series
         .fillna("")
@@ -555,90 +544,7 @@ def classify_status(series):
         .str.casefold()
     )
 
-    pending_pattern = (
-        r"pending|under\s*process|"
-        r"in\s*progress|awaiting|"
-        r"under\s*review|returned|"
-        r"objection"
-    )
-
-    completed_pattern = (
-        r"complete|completed|done|"
-        r"approved|settled|paid|closed"
-    )
-
-    pending = data.str.contains(
-        pending_pattern,
-        regex=True,
-        na=False
-    )
-
-    completed = data.str.contains(
-        completed_pattern,
-        regex=True,
-        na=False
-    )
-
-    return pending, completed
-
-
-def status_mask(
-    dataframe,
-    status_col,
-    pattern
-):
-
-    if (
-        not status_col
-        or status_col not in dataframe.columns
-    ):
-
-        return pd.Series(
-            False,
-            index=dataframe.index
-        )
-
-    if pattern == "pending":
-
-        return classify_status(
-            dataframe[status_col]
-        )[0]
-
-    if pattern == "complete|completed|done":
-
-        return classify_status(
-            dataframe[status_col]
-        )[1]
-
-    values = (
-        dataframe[status_col]
-        .fillna("")
-        .astype(str)
-        .str.strip()
-        .str.casefold()
-    )
-
-    return values.str.contains(
-        pattern,
-        regex=True,
-        na=False
-    )
-
-
-def missing_mask(
-    series,
-    include_no=False
-):
-
-    values = (
-        series
-        .fillna("")
-        .astype(str)
-        .str.strip()
-        .str.casefold()
-    )
-
-    missing_values = [
+    values = [
         "",
         "none",
         "nan",
@@ -649,21 +555,65 @@ def missing_mask(
     ]
 
     if include_no:
-
-        missing_values.extend([
+        values.extend([
             "no",
             "pending",
             "not available"
         ])
 
-    return values.isin(
-        missing_values
+    return data.isin(values)
+
+
+def unique_employee_count(dataframe, uin_col, employee_name_col):
+    if uin_col and uin_col in dataframe.columns:
+        values = (
+            dataframe[uin_col]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+        )
+
+        return int(values.nunique())
+
+    if employee_name_col and employee_name_col in dataframe.columns:
+        values = (
+            dataframe[employee_name_col]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .replace("", pd.NA)
+            .dropna()
+        )
+
+        return int(values.nunique())
+
+    return len(dataframe)
+
+
+def duplicate_uin_dataframe(dataframe, uin_col):
+    if not uin_col or uin_col not in dataframe.columns:
+        return pd.DataFrame(
+            columns=dataframe.columns
+        )
+
+    uin_data = (
+        dataframe[uin_col]
+        .fillna("")
+        .astype(str)
+        .str.strip()
     )
 
+    duplicate_mask = (
+        uin_data.ne("")
+        & uin_data.duplicated(keep=False)
+    )
 
-# =========================================================
-# BN SUMMARY
-# =========================================================
+    return dataframe.loc[
+        duplicate_mask
+    ].copy()
+
 
 def build_bn_summary(
     dataframe,
@@ -674,12 +624,7 @@ def build_bn_summary(
     nomination_col,
     uin_col
 ):
-
-    if (
-        not bn_col
-        or bn_col not in dataframe.columns
-    ):
-
+    if not bn_col or bn_col not in dataframe.columns:
         return pd.DataFrame()
 
     rows = []
@@ -689,17 +634,13 @@ def build_bn_summary(
         dropna=False,
         sort=True
     ):
-
-        bn_display = str(
-            bn_value
-        ).strip()
+        bn_display = str(bn_value).strip()
 
         if bn_display.casefold() in [
             "",
             "nan",
             "none"
         ]:
-
             bn_display = "Blank BN"
 
         total = len(group)
@@ -712,8 +653,7 @@ def build_bn_summary(
                     "pending"
                 ).sum()
             )
-            if status_col
-            else 0
+            if status_col else 0
         )
 
         completed = (
@@ -724,8 +664,7 @@ def build_bn_summary(
                     "complete|completed|done"
                 ).sum()
             )
-            if status_col
-            else 0
+            if status_col else 0
         )
 
         missing_pran = (
@@ -734,7 +673,7 @@ def build_bn_summary(
                     group[pran_col]
                 ).sum()
             )
-            if pran_col
+            if pran_col and pran_col in group.columns
             else 0
         )
 
@@ -745,14 +684,13 @@ def build_bn_summary(
                     include_no=True
                 ).sum()
             )
-            if nomination_col
+            if nomination_col and nomination_col in group.columns
             else 0
         )
 
         duplicate_uin = 0
 
-        if uin_col:
-
+        if uin_col and uin_col in group.columns:
             uin_data = (
                 group[uin_col]
                 .fillna("")
@@ -762,74 +700,89 @@ def build_bn_summary(
 
             duplicate_mask = (
                 uin_data.ne("")
-                &
-                uin_data.duplicated(
-                    keep=False
-                )
+                & uin_data.duplicated(keep=False)
             )
 
             duplicate_uin = int(
                 duplicate_mask.sum()
             )
 
-        if amount_col:
-
-            contribution = (
-                pd.to_numeric(
-                    group[amount_col],
-                    errors="coerce"
-                )
-                .fillna(0)
-                .sum()
-            )
-
+        if amount_col and amount_col in group.columns:
+            contribution = pd.to_numeric(
+                group[amount_col],
+                errors="coerce"
+            ).fillna(0).sum()
         else:
-
             contribution = 0
 
         rows.append({
-
             "BN": bn_display,
-
             "Total Employees": total,
-
             "Pending": pending,
-
             "Completed": completed,
-
             "Missing PRAN": missing_pran,
-
             "Missing Nomination": missing_nomination,
-
             "Duplicate UIN Records": duplicate_uin,
-
             "Total Contribution": contribution
         })
 
     return pd.DataFrame(rows)
 
 
-# =========================================================
-# UPLOAD
-# =========================================================
+def clean_blank_rows(dataframe):
+    """Remove rows where all actual data fields are blank."""
+    if dataframe.empty:
+        return dataframe.copy()
 
-st.caption(
-    "V5: smart column detection, broader status classification, "
-    "duplicate-UIN metrics and enhanced KPIs."
-)
+    check_df = dataframe.copy()
 
+    check_df = check_df.replace(
+        {
+            r"^\s*$": pd.NA,
+            "None": pd.NA,
+            "none": pd.NA,
+            "nan": pd.NA,
+            "NaN": pd.NA,
+            "null": pd.NA,
+            "NULL": pd.NA
+        },
+        regex=True
+    )
+
+    blank_mask = check_df.isna().all(axis=1)
+
+    return dataframe.loc[
+        ~blank_mask
+    ].reset_index(drop=True)
+
+
+def calculate_completion(missing_count, total_count):
+    if total_count <= 0:
+        return 0.0
+
+    value = (
+        (total_count - missing_count)
+        / total_count
+        * 100
+    )
+
+    return round(max(0, min(100, value)), 1)
+
+
+# =========================================================
+# MULTIPLE EXCEL FILE UPLOAD
+# =========================================================
 uploaded_files = st.file_uploader(
     "Upload Excel File(s) - Multiple files allowed",
     type=["xlsx", "xls"],
-    accept_multiple_files=True
+    accept_multiple_files=True,
+    help="You can upload multiple Excel files together."
 )
 
 if not uploaded_files:
-
     st.info(
         "Please upload one or more Excel files to start."
     )
-
     st.stop()
 
 st.success(
@@ -838,22 +791,18 @@ st.success(
 
 
 # =========================================================
-# COMBINE FILES + SHEETS
+# COMBINE ALL FILES + ALL SHEETS
 # =========================================================
-
 all_dataframes = []
 file_sheet_summary = []
 
 for uploaded_file in uploaded_files:
-
     try:
-
         excel_file = pd.ExcelFile(
             uploaded_file
         )
 
         for sheet_name in excel_file.sheet_names:
-
             temp_df = pd.read_excel(
                 uploaded_file,
                 sheet_name=sheet_name
@@ -862,21 +811,28 @@ for uploaded_file in uploaded_files:
             if temp_df.empty:
                 continue
 
+            # Normalize headings
             temp_df.columns = normalize_columns(
                 temp_df.columns
             )
 
-            temp_df = clean_empty_rows(
+            # Merge duplicate master headings
+            temp_df = merge_duplicate_master_columns(
+                temp_df
+            )
+
+            # Remove blank rows
+            temp_df = clean_blank_rows(
                 temp_df
             )
 
             if temp_df.empty:
                 continue
 
+            # Source tracking
             temp_df["Source File"] = (
                 uploaded_file.name
             )
-
             temp_df["Source Sheet"] = (
                 sheet_name
             )
@@ -886,35 +842,27 @@ for uploaded_file in uploaded_files:
             )
 
             file_sheet_summary.append({
-
-                "Source File":
-                    uploaded_file.name,
-
-                "Source Sheet":
-                    sheet_name,
-
-                "Records":
-                    len(temp_df)
+                "Source File": uploaded_file.name,
+                "Source Sheet": sheet_name,
+                "Records": len(temp_df)
             })
 
     except Exception as e:
-
         st.warning(
-            f"Unable to read "
-            f"{uploaded_file.name}: {e}"
+            f"Unable to read {uploaded_file.name}: {e}"
         )
 
 
 if not all_dataframes:
-
     st.error(
-        "No readable data was found "
-        "in the uploaded Excel files."
+        "No readable data was found in the uploaded Excel files."
     )
-
     st.stop()
 
 
+# =========================================================
+# FINAL MASTER DATA
+# =========================================================
 df = pd.concat(
     all_dataframes,
     ignore_index=True,
@@ -925,13 +873,42 @@ df.columns = normalize_columns(
     df.columns
 )
 
-df = clean_empty_rows(
-    df,
-    exclude_columns=[
+df = merge_duplicate_master_columns(
+    df
+)
+
+# Remove completely blank records while ignoring source fields.
+data_columns = [
+    col
+    for col in df.columns
+    if col not in [
         "Source File",
         "Source Sheet"
     ]
-)
+]
+
+if data_columns:
+    check_df = df[data_columns].copy()
+
+    check_df = check_df.replace(
+        {
+            r"^\s*$": pd.NA,
+            "None": pd.NA,
+            "none": pd.NA,
+            "nan": pd.NA,
+            "NaN": pd.NA,
+            "null": pd.NA,
+            "NULL": pd.NA
+        },
+        regex=True
+    )
+
+    final_blank_mask = check_df.isna().all(axis=1)
+
+    df = df.loc[
+        ~final_blank_mask
+    ].reset_index(drop=True)
+
 
 st.success(
     "All uploaded files were combined successfully. "
@@ -940,13 +917,9 @@ st.success(
 
 
 # =========================================================
-# SOURCE SUMMARY
+# SOURCE FILE SUMMARY
 # =========================================================
-
-with st.expander(
-    "Uploaded Files Summary"
-):
-
+with st.expander("Uploaded Files Summary"):
     source_summary = pd.DataFrame(
         file_sheet_summary
     )
@@ -961,7 +934,6 @@ with st.expander(
 # =========================================================
 # COLUMN DETECTION
 # =========================================================
-
 bn_col = find_column(
     df.columns,
     {
@@ -1031,180 +1003,9 @@ nomination_col = find_column(
 
 
 # =========================================================
-# VALID RECORD FILTER
-# =========================================================
-
-primary_columns = [
-    uin_col,
-    employee_name_col,
-    bn_col
-]
-
-primary_columns = [
-    col
-    for col in primary_columns
-    if col is not None
-    and col in df.columns
-]
-
-secondary_columns = [
-    pran_col,
-    nomination_col,
-    status_col,
-    amount_col
-]
-
-secondary_columns = [
-    col
-    for col in secondary_columns
-    if col is not None
-    and col in df.columns
-]
-
-empty_tokens = [
-    "",
-    "none",
-    "nan",
-    "null",
-    "n/a",
-    "na",
-    "nat",
-    "-"
-]
-
-if primary_columns:
-
-    check = pd.DataFrame(
-        index=df.index
-    )
-
-    for col in primary_columns:
-
-        values = (
-            df[col]
-            .astype("string")
-            .str.replace(
-                "\u00a0",
-                " ",
-                regex=False
-            )
-            .str.strip()
-            .str.casefold()
-        )
-
-        check[col] = (
-            values.notna()
-            &
-            ~values.isin(
-                empty_tokens
-            )
-        )
-
-    valid_mask = check.any(
-        axis=1
-    )
-
-    df = df.loc[
-        valid_mask
-    ].copy()
-
-elif secondary_columns:
-
-    check = pd.DataFrame(
-        index=df.index
-    )
-
-    for col in secondary_columns:
-
-        values = (
-            df[col]
-            .astype("string")
-            .str.replace(
-                "\u00a0",
-                " ",
-                regex=False
-            )
-            .str.strip()
-            .str.casefold()
-        )
-
-        check[col] = (
-            values.notna()
-            &
-            ~values.isin(
-                empty_tokens
-            )
-        )
-
-    valid_mask = check.any(
-        axis=1
-    )
-
-    df = df.loc[
-        valid_mask
-    ].copy()
-
-
-df = clean_empty_rows(
-    df,
-    exclude_columns=[
-        "Source File",
-        "Source Sheet"
-    ]
-)
-
-df.reset_index(
-    drop=True,
-    inplace=True
-)
-
-
-# =========================================================
-# UNIQUE EMPLOYEE MASTER
-# =========================================================
-
-raw_df = df.copy()
-
-if uin_col:
-
-    uin_clean = (
-        raw_df[uin_col]
-        .fillna("")
-        .astype(str)
-        .str.strip()
-    )
-
-    valid_uin = uin_clean.ne("")
-
-    master_df = raw_df.loc[
-        valid_uin
-    ].copy()
-
-    master_df = (
-        master_df
-        .drop_duplicates(
-            subset=[uin_col],
-            keep="first"
-        )
-        .reset_index(drop=True)
-    )
-
-else:
-
-    master_df = (
-        raw_df
-        .drop_duplicates()
-        .reset_index(drop=True)
-    )
-
-
-# =========================================================
 # SEARCH & FILTER
 # =========================================================
-
-st.subheader(
-    "Search and Filter"
-)
+st.subheader("Search and Filter")
 
 search_text = st.text_input(
     "Search UIN, Employee Name, BN, PRAN, Mobile, Status, etc."
@@ -1213,7 +1014,6 @@ search_text = st.text_input(
 filtered_df = df.copy()
 
 if search_text.strip():
-
     search_value = (
         search_text
         .strip()
@@ -1226,10 +1026,8 @@ if search_text.strip():
         .astype(str)
     )
 
-    search_mask = search_data.apply(
-        lambda col:
-        col.str.casefold()
-        .str.contains(
+    mask = search_data.apply(
+        lambda col: col.str.casefold().str.contains(
             re.escape(search_value),
             regex=True,
             na=False
@@ -1237,21 +1035,22 @@ if search_text.strip():
     ).any(axis=1)
 
     filtered_df = filtered_df.loc[
-        search_mask
+        mask
     ].copy()
 
     st.info(
-        f"Search result: "
-        f"{len(filtered_df)} record(s) found."
+        f"Search result: {len(filtered_df)} record(s) found."
     )
 
 
+# BN filter
 if bn_col:
-
     bn_values = sorted(
         df[bn_col]
         .dropna()
         .astype(str)
+        .str.strip()
+        .loc[lambda s: s.ne("")]
         .unique()
         .tolist()
     )
@@ -1262,24 +1061,22 @@ if bn_col:
     )
 
     if selected_bn != "All":
-
         filtered_df = filtered_df[
             filtered_df[bn_col]
             .astype(str)
+            .str.strip()
             == selected_bn
         ].copy()
 
-else:
 
-    selected_bn = "All"
-
-
+# Status filter
 if status_col:
-
     status_values = sorted(
         df[status_col]
         .dropna()
         .astype(str)
+        .str.strip()
+        .loc[lambda s: s.ne("")]
         .unique()
         .tolist()
     )
@@ -1290,551 +1087,186 @@ if status_col:
     )
 
     if selected_status != "All":
-
         filtered_df = filtered_df[
             filtered_df[status_col]
             .astype(str)
+            .str.strip()
             == selected_status
         ].copy()
-
-else:
-
-    selected_status = "All"
-
-
-# =========================================================
-# MASTER FILTER
-# =========================================================
-
-master_filtered_df = master_df.copy()
-
-
-if search_text.strip():
-
-    search_value = (
-        search_text
-        .strip()
-        .casefold()
-    )
-
-    master_search_data = (
-        master_filtered_df
-        .fillna("")
-        .astype(str)
-    )
-
-    master_search_mask = (
-        master_search_data.apply(
-            lambda col:
-            col.str.casefold()
-            .str.contains(
-                re.escape(search_value),
-                regex=True,
-                na=False
-            )
-        )
-        .any(axis=1)
-    )
-
-    master_filtered_df = (
-        master_filtered_df.loc[
-            master_search_mask
-        ].copy()
-    )
-
-
-if (
-    bn_col
-    and selected_bn != "All"
-):
-
-    master_filtered_df = (
-        master_filtered_df[
-            master_filtered_df[bn_col]
-            .astype(str)
-            == selected_bn
-        ].copy()
-    )
-
-
-if (
-    status_col
-    and selected_status != "All"
-):
-
-    master_filtered_df = (
-        master_filtered_df[
-            master_filtered_df[status_col]
-            .astype(str)
-            == selected_status
-        ].copy()
-    )
-
-
-# =========================================================
-# UNIQUE EMPLOYEE MASTER VIEW
-# =========================================================
-
-st.subheader(
-    "Unique Employee Master"
-)
-
-st.caption(
-    "One unique record per UIN. "
-    "Duplicate UIN records remain available "
-    "in the Duplicate UIN Report."
-)
-
-st.info(
-    "Unique Employee Master: "
-    f"{len(master_filtered_df):,} employee(s)"
-)
-
-st.dataframe(
-    master_filtered_df,
-    use_container_width=True,
-    hide_index=True,
-    height=400
-)
-
-master_excel = make_excel(
-    master_filtered_df,
-    "Employee Master"
-)
-
-st.download_button(
-    "Download Unique Employee Master",
-    data=master_excel,
-    file_name="Unique_Employee_Master.xlsx",
-    mime=(
-        "application/vnd.openxmlformats-officedocument."
-        "spreadsheetml.sheet"
-    ),
-    key="download_unique_employee_master"
-)
 
 
 # =========================================================
 # DASHBOARD
 # =========================================================
+st.subheader("Automatic Dashboard")
 
-st.subheader(
-    "Automatic Dashboard"
+st.markdown(
+    '<div class="dashboard-note">'
+    'Dashboard figures are calculated from the current Search, BN and Case Status filters.'
+    '</div>',
+    unsafe_allow_html=True
 )
 
-total_records = len(
-    filtered_df
-)
+total_records = len(filtered_df)
 
-unique_employee_count = len(
-    master_filtered_df
+unique_employee_count = unique_employee_count(
+    filtered_df,
+    uin_col,
+    employee_name_col
 )
-
 
 pending_count = (
     int(
         status_mask(
-            master_filtered_df,
+            filtered_df,
             status_col,
             "pending"
         ).sum()
     )
-    if status_col
-    else 0
+    if status_col else 0
 )
-
 
 completed_count = (
     int(
         status_mask(
-            master_filtered_df,
+            filtered_df,
             status_col,
             "complete|completed|done"
         ).sum()
     )
-    if status_col
-    else 0
+    if status_col else 0
 )
-
-
-total_amount = (
-    pd.to_numeric(
-        master_filtered_df[amount_col],
-        errors="coerce"
-    )
-    .fillna(0)
-    .sum()
-    if amount_col
-    else 0
-)
-
 
 missing_pran_count = (
     int(
         missing_mask(
-            master_filtered_df[pran_col]
+            filtered_df[pran_col]
         ).sum()
     )
-    if pran_col
+    if pran_col and pran_col in filtered_df.columns
     else 0
 )
-
 
 missing_nomination_count = (
     int(
         missing_mask(
-            master_filtered_df[nomination_col],
+            filtered_df[nomination_col],
             include_no=True
         ).sum()
     )
-    if nomination_col
+    if nomination_col and nomination_col in filtered_df.columns
     else 0
 )
 
-
-pran_completion_pct = (
-    round(
-        (
-            (
-                unique_employee_count
-                - missing_pran_count
-            )
-            / unique_employee_count
-        )
-        * 100,
-        1
-    )
-    if unique_employee_count
+total_amount = (
+    pd.to_numeric(
+        filtered_df[amount_col],
+        errors="coerce"
+    ).fillna(0).sum()
+    if amount_col and amount_col in filtered_df.columns
     else 0
 )
 
-
-nomination_completion_pct = (
-    round(
-        (
-            (
-                unique_employee_count
-                - missing_nomination_count
-            )
-            / unique_employee_count
-        )
-        * 100,
-        1
-    )
-    if unique_employee_count
-    else 0
+pran_completion = calculate_completion(
+    missing_pran_count,
+    total_records
 )
 
-
-# =========================================================
-# DUPLICATE UIN METRIC
-# =========================================================
-
-if uin_col:
-
-    dashboard_uin = (
-        filtered_df[uin_col]
-        .fillna("")
-        .astype(str)
-        .str.strip()
-    )
-
-    duplicate_mask = (
-        dashboard_uin.ne("")
-        &
-        dashboard_uin.duplicated(
-            keep=False
-        )
-    )
-
-    duplicate_uin_unique_count = int(
-        dashboard_uin[
-            duplicate_mask
-        ].nunique()
-    )
-
-else:
-
-    duplicate_uin_unique_count = 0
-
-
-pending_pct = (
-    round(
-        (
-            pending_count
-            / unique_employee_count
-        )
-        * 100,
-        1
-    )
-    if unique_employee_count
-    else 0
+nomination_completion = calculate_completion(
+    missing_nomination_count,
+    total_records
 )
 
-
-completed_pct = (
-    round(
-        (
-            completed_count
-            / unique_employee_count
-        )
-        * 100,
-        1
+duplicate_uin_count = len(
+    duplicate_uin_dataframe(
+        filtered_df,
+        uin_col
     )
-    if unique_employee_count
-    else 0
 )
 
 
 # =========================================================
 # DASHBOARD CARDS
 # =========================================================
+c1, c2, c3, c4 = st.columns(4)
 
-card_data = [
-
-    (
+with c1:
+    st.metric(
         "Total Records",
-        f"{total_records:,}",
-        "dashboard-blue"
-    ),
+        f"{total_records:,}"
+    )
 
-    (
+with c2:
+    st.metric(
         "Unique Employees",
-        f"{unique_employee_count:,}",
-        "dashboard-purple"
-    ),
+        f"{unique_employee_count:,}"
+    )
 
-    (
+with c3:
+    st.metric(
         "Pending",
-        f"{pending_count:,}",
-        "dashboard-orange"
-    ),
+        f"{pending_count:,}"
+    )
 
-    (
+with c4:
+    st.metric(
         "Completed",
-        f"{completed_count:,}",
-        "dashboard-green"
-    ),
+        f"{completed_count:,}"
+    )
 
-    (
+
+c5, c6, c7, c8 = st.columns(4)
+
+with c5:
+    st.metric(
         "Missing PRAN",
-        f"{missing_pran_count:,}",
-        "dashboard-red"
-    ),
+        f"{missing_pran_count:,}"
+    )
 
-    (
+with c6:
+    st.metric(
         "PRAN Completion",
-        f"{pran_completion_pct:.1f}%",
-        "dashboard-teal"
-    ),
+        f"{pran_completion:.1f}%"
+    )
 
-    (
+with c7:
+    st.metric(
         "Missing Nomination",
-        f"{missing_nomination_count:,}",
-        "dashboard-pink"
-    ),
+        f"{missing_nomination_count:,}"
+    )
 
-    (
+with c8:
+    st.metric(
         "Nomination Completion",
-        f"{nomination_completion_pct:.1f}%",
-        "dashboard-blue"
-    ),
+        f"{nomination_completion:.1f}%"
+    )
 
-    (
-        "Duplicate UIN",
-        f"{duplicate_uin_unique_count:,}",
-        "dashboard-red"
-    ),
 
-    (
+c9, c10 = st.columns(2)
+
+with c9:
+    st.metric(
+        "Duplicate UIN Records",
+        f"{duplicate_uin_count:,}"
+    )
+
+with c10:
+    st.metric(
         "Total Contribution",
-        f"INR {total_amount:,.0f}",
-        "dashboard-teal"
-    )
-]
-
-
-card_html = ""
-
-for label, value, tone in card_data:
-
-    card_html += f"""
-    <div class="dashboard-card {tone}">
-        <div class="dashboard-top">
-            <span class="dashboard-dot"></span>
-            <span class="dashboard-label">
-                {label}
-            </span>
-        </div>
-
-        <div class="dashboard-value">
-            {value}
-        </div>
-    </div>
-    """
-
-
-st.markdown(
-    f"""
-    <div class="dashboard-grid">
-        {card_html}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# =========================================================
-# DASHBOARD CHARTS
-# =========================================================
-
-st.markdown(
-    "### Dashboard Charts"
-)
-
-chart_col1, chart_col2 = st.columns(2)
-
-
-# ---------------- BN CHART ----------------
-
-with chart_col1:
-
-    st.markdown(
-        "**BN-wise Employee Count**"
+        f"INR {total_amount:,.2f}"
     )
 
-    if bn_col:
-
-        bn_chart_values = (
-            master_filtered_df[bn_col]
-            .astype("string")
-            .str.strip()
-        )
-
-        bn_chart_values = (
-            bn_chart_values.mask(
-                bn_chart_values
-                .str.casefold()
-                .isin([
-                    "",
-                    "none",
-                    "nan",
-                    "null",
-                    "n/a",
-                    "na"
-                ]),
-                "Blank BN"
-            )
-        )
-
-        bn_chart = (
-            bn_chart_values
-            .fillna("Blank BN")
-            .value_counts()
-            .rename_axis("BN")
-            .reset_index(
-                name="Employees"
-            )
-            .set_index("BN")
-        )
-
-        if not bn_chart.empty:
-
-            st.bar_chart(
-                bn_chart,
-                use_container_width=True
-            )
-
-        else:
-
-            st.info(
-                "No BN data available."
-            )
-
-    else:
-
-        st.info(
-            "BN column not found."
-        )
-
-
-# ---------------- STATUS CHART ----------------
-
-with chart_col2:
-
-    st.markdown(
-        "**Case Status**"
-    )
-
-    if status_col:
-
-        status_chart_values = (
-            master_filtered_df[status_col]
-            .astype("string")
-            .str.strip()
-        )
-
-        status_chart_values = (
-            status_chart_values.mask(
-                status_chart_values
-                .str.casefold()
-                .isin([
-                    "",
-                    "none",
-                    "nan",
-                    "null",
-                    "n/a",
-                    "na"
-                ]),
-                "Blank"
-            )
-        )
-
-        status_chart = (
-            status_chart_values
-            .fillna("Blank")
-            .value_counts()
-            .rename_axis("Status")
-            .reset_index(
-                name="Employees"
-            )
-            .set_index("Status")
-        )
-
-        if not status_chart.empty:
-
-            st.bar_chart(
-                status_chart,
-                use_container_width=True
-            )
-
-        else:
-
-            st.info(
-                "No status data available."
-            )
-
-    else:
-
-        st.info(
-            "Case Status column not found."
-        )
-
 
 # =========================================================
-# BN SUMMARY
+# BN-WISE SUMMARY
 # =========================================================
-
 bn_summary = pd.DataFrame()
 
 if bn_col:
-
-    st.subheader(
-        "BN-wise Summary"
-    )
+    st.subheader("BN-wise Summary")
 
     bn_summary = build_bn_summary(
-        master_filtered_df,
+        filtered_df,
         bn_col,
         status_col,
         amount_col,
@@ -1843,31 +1275,76 @@ if bn_col:
         uin_col
     )
 
-    st.dataframe(
-        bn_summary,
-        use_container_width=True,
-        hide_index=True
-    )
+    if not bn_summary.empty:
+
+        bn_summary["Pending %"] = (
+            bn_summary["Pending"]
+            .div(
+                bn_summary[
+                    "Total Employees"
+                ].replace(0, pd.NA)
+            )
+            .mul(100)
+            .fillna(0)
+            .round(1)
+        )
+
+        bn_summary["Completed %"] = (
+            bn_summary["Completed"]
+            .div(
+                bn_summary[
+                    "Total Employees"
+                ].replace(0, pd.NA)
+            )
+            .mul(100)
+            .fillna(0)
+            .round(1)
+        )
+
+        st.dataframe(
+            bn_summary,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        chart_data = bn_summary.set_index(
+            "BN"
+        )[[
+            "Total Employees",
+            "Pending",
+            "Completed",
+            "Missing PRAN",
+            "Missing Nomination"
+        ]]
+
+        st.caption(
+            "BN-wise employee and case-status overview"
+        )
+
+        st.bar_chart(
+            chart_data,
+            use_container_width=True
+        )
+
+    else:
+        st.info(
+            "No BN-wise data available for the current filters."
+        )
 
 
 # =========================================================
 # CASE STATUS SUMMARY
 # =========================================================
-
 status_summary = pd.DataFrame()
 
 if status_col:
-
-    st.subheader(
-        "Case Status Summary"
-    )
+    st.subheader("Case Status Summary")
 
     status_summary = (
-        master_filtered_df[
-            status_col
-        ]
+        filtered_df[status_col]
         .fillna("Blank")
         .astype(str)
+        .replace("", "Blank")
         .value_counts()
         .reset_index()
     )
@@ -1883,32 +1360,52 @@ if status_col:
         hide_index=True
     )
 
-    st.caption(
-        f"Pending rate: "
-        f"{pending_pct:.1f}% | "
-        f"Completed rate: "
-        f"{completed_pct:.1f}%"
-    )
+
+# =========================================================
+# BN REPORT
+# =========================================================
+if bn_col:
+    st.subheader("BN Report")
+
+    if st.button(
+        "Generate BN Report",
+        key="generate_bn_report"
+    ):
+        st.dataframe(
+            bn_summary,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        bn_excel = make_excel(
+            bn_summary,
+            "BN Report"
+        )
+
+        st.download_button(
+            "Download BN Report",
+            data=bn_excel,
+            file_name="BN_Report.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key="download_bn_report"
+        )
 
 
 # =========================================================
-# EMPLOYEE REPORT
+# SMART EMPLOYEE-WISE REPORT
 # =========================================================
+st.subheader("Employee-wise Report")
 
-st.subheader(
-    "Employee-wise Report"
-)
-
-employee_report = (
-    master_filtered_df.copy()
-)
+employee_report = filtered_df.copy()
 
 st.write(
-    "Total Unique Employees: "
-    f"**{len(employee_report):,}**"
+    f"Total Unique Employees: **{unique_employee_count}**"
 )
 
-if not employee_report.empty:
+if len(employee_report) > 0:
 
     st.dataframe(
         employee_report,
@@ -1934,56 +1431,26 @@ if not employee_report.empty:
     )
 
 else:
-
     st.info(
         "No employee records found."
     )
 
 
 # =========================================================
-# DUPLICATE UIN REPORT
-# IMPORTANT: RAW FILTERED DATA USED HERE
+# DUPLICATE UIN
 # =========================================================
-
-duplicate_uin_report = pd.DataFrame()
+duplicate_uin_report = duplicate_uin_dataframe(
+    employee_report,
+    uin_col
+)
 
 if uin_col:
+    st.subheader("Duplicate UIN Report")
 
-    st.subheader(
-        "Duplicate UIN Report"
-    )
-
-    uin_data = (
-        filtered_df[uin_col]
-        .fillna("")
-        .astype(str)
-        .str.strip()
-    )
-
-    duplicate_mask = (
-        uin_data.ne("")
-        &
-        uin_data.duplicated(
-            keep=False
-        )
-    )
-
-    duplicate_uin_report = (
-        filtered_df.loc[
-            duplicate_mask
-        ].copy()
-    )
-
-    duplicate_uin_unique_count = int(
-        uin_data[
-            duplicate_mask
-        ].nunique()
-    )
-
-    if not duplicate_uin_report.empty:
+    if len(duplicate_uin_report) > 0:
 
         st.warning(
-            "Duplicate UIN Records: "
+            f"Duplicate UIN Records: "
             f"{len(duplicate_uin_report)}"
         )
 
@@ -2010,7 +1477,6 @@ if uin_col:
         )
 
     else:
-
         st.success(
             "No duplicate UIN found."
         )
@@ -2018,31 +1484,26 @@ if uin_col:
 
 # =========================================================
 # MISSING PRAN
-# UNIQUE EMPLOYEE BASIS
 # =========================================================
-
 missing_pran_report = pd.DataFrame()
 
 if pran_col:
-
-    st.subheader(
-        "Missing PRAN Report"
-    )
+    st.subheader("Missing PRAN Report")
 
     missing_pran_mask = missing_mask(
         employee_report[pran_col]
     )
 
     missing_pran_report = (
-        employee_report.loc[
+        employee_report[
             missing_pran_mask
         ].copy()
     )
 
-    if not missing_pran_report.empty:
+    if len(missing_pran_report) > 0:
 
         st.warning(
-            "Employees without PRAN: "
+            f"Employees without PRAN: "
             f"{len(missing_pran_report)}"
         )
 
@@ -2069,7 +1530,6 @@ if pran_col:
         )
 
     else:
-
         st.success(
             "All employees have PRAN."
         )
@@ -2077,34 +1537,27 @@ if pran_col:
 
 # =========================================================
 # MISSING NOMINATION
-# UNIQUE EMPLOYEE BASIS
 # =========================================================
-
 missing_nomination_report = pd.DataFrame()
 
 if nomination_col:
-
-    st.subheader(
-        "Missing Nomination Report"
-    )
+    st.subheader("Missing Nomination Report")
 
     missing_nomination_mask = missing_mask(
-        employee_report[
-            nomination_col
-        ],
+        employee_report[nomination_col],
         include_no=True
     )
 
     missing_nomination_report = (
-        employee_report.loc[
+        employee_report[
             missing_nomination_mask
         ].copy()
     )
 
-    if not missing_nomination_report.empty:
+    if len(missing_nomination_report) > 0:
 
         st.warning(
-            "Employees with missing nomination: "
+            f"Employees with missing nomination: "
             f"{len(missing_nomination_report)}"
         )
 
@@ -2131,64 +1584,22 @@ if nomination_col:
         )
 
     else:
-
         st.success(
             "All employees have nomination."
         )
 
 
 # =========================================================
-# BN REPORT
+# BN-WISE COMPLETE EXCEL REPORT
 # =========================================================
-
 if bn_col:
-
-    st.subheader(
-        "BN Report"
-    )
-
-    if st.button(
-        "Generate BN Report",
-        key="generate_bn_report"
-    ):
-
-        st.dataframe(
-            bn_summary,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        bn_excel = make_excel(
-            bn_summary,
-            "BN Report"
-        )
-
-        st.download_button(
-            "Download BN Report",
-            data=bn_excel,
-            file_name="BN_Report.xlsx",
-            mime=(
-                "application/vnd.openxmlformats-officedocument."
-                "spreadsheetml.sheet"
-            ),
-            key="download_bn_report"
-        )
-
-
-# =========================================================
-# BN-WISE COMPLETE EXCEL
-# =========================================================
-
-if bn_col:
-
     st.subheader(
         "BN-wise Complete Excel Report"
     )
 
     st.write(
-        "One Excel file containing Summary, "
-        "BN Summary, Filtered Data and "
-        "separate sheets for each BN."
+        "One Excel file containing Summary, BN Summary, "
+        "Filtered Data, and a separate sheet for each BN."
     )
 
     if st.button(
@@ -2196,18 +1607,19 @@ if bn_col:
         key="generate_bn_complete_report"
     ):
 
-        output = BytesIO()
-        used_names = set()
+        bn_output = BytesIO()
+        used_sheet_names = set()
 
         with pd.ExcelWriter(
-            output,
+            bn_output,
             engine="openpyxl"
         ) as writer:
 
+            # -------------------------------------------------
+            # Summary
+            # -------------------------------------------------
             summary_data = pd.DataFrame({
-
                 "Particular": [
-
                     "Total Records",
                     "Pending",
                     "Completed",
@@ -2215,12 +1627,9 @@ if bn_col:
                     "Unique Employees",
                     "Missing PRAN",
                     "Missing Nomination",
-                    "Duplicate UIN Records",
-                    "Unique Duplicate UINs"
+                    "Duplicate UIN Records"
                 ],
-
                 "Value": [
-
                     total_records,
                     pending_count,
                     completed_count,
@@ -2228,71 +1637,78 @@ if bn_col:
                     unique_employee_count,
                     len(missing_pran_report),
                     len(missing_nomination_report),
-                    len(duplicate_uin_report),
-                    duplicate_uin_unique_count
+                    len(duplicate_uin_report)
                 ]
             })
+
+            summary_sheet = "Summary"
 
             summary_data.to_excel(
                 writer,
                 index=False,
-                sheet_name="Summary"
+                sheet_name=summary_sheet
             )
 
             format_excel_writer(
                 writer,
                 summary_data,
-                "Summary"
+                summary_sheet
             )
 
-            used_names.add(
-                "Summary"
+            used_sheet_names.add(
+                summary_sheet
             )
 
+            # -------------------------------------------------
+            # BN Summary
+            # -------------------------------------------------
+            bn_summary_sheet = "BN Summary"
 
             bn_summary.to_excel(
                 writer,
                 index=False,
-                sheet_name="BN Summary"
+                sheet_name=bn_summary_sheet
             )
 
             format_excel_writer(
                 writer,
                 bn_summary,
-                "BN Summary"
+                bn_summary_sheet
             )
 
-            used_names.add(
-                "BN Summary"
+            used_sheet_names.add(
+                bn_summary_sheet
             )
 
+            # -------------------------------------------------
+            # Filtered Data
+            # -------------------------------------------------
+            filtered_sheet = "Filtered Data"
 
             filtered_df.to_excel(
                 writer,
                 index=False,
-                sheet_name="Filtered Data"
+                sheet_name=filtered_sheet
             )
 
             format_excel_writer(
                 writer,
                 filtered_df,
-                "Filtered Data"
+                filtered_sheet
             )
 
-            used_names.add(
-                "Filtered Data"
+            used_sheet_names.add(
+                filtered_sheet
             )
 
-
-            # UNIQUE DATA IN BN SHEETS
-            for bn_value, group in (
-                master_filtered_df.groupby(
-                    bn_col,
-                    dropna=False,
-                    sort=True
-                )
+            # -------------------------------------------------
+            # One sheet for each BN
+            # -------------------------------------------------
+            for bn_value, group in filtered_df.groupby(
+                bn_col,
+                dropna=False,
+                sort=True
             ):
-
                 bn_display = str(
                     bn_value
                 ).strip()
@@ -2302,31 +1718,116 @@ if bn_col:
                     "nan",
                     "none"
                 ]:
-
                     bn_display = "Blank BN"
 
                 sheet_name = safe_sheet_name(
                     f"BN-{bn_display}",
-                    used_names
+                    used_sheet_names
                 )
 
-                used_names.add(
+                used_sheet_names.add(
                     sheet_name
                 )
+
+                mini_summary = build_bn_summary(
+                    group,
+                    bn_col,
+                    status_col,
+                    amount_col,
+                    pran_col,
+                    nomination_col,
+                    uin_col
+                )
+
+                if not mini_summary.empty:
+                    mini_row = (
+                        mini_summary.iloc[0]
+                    )
+
+                    mini = pd.DataFrame({
+                        "Particular": [
+                            "BN",
+                            "Total Employees",
+                            "Pending",
+                            "Completed",
+                            "Missing PRAN",
+                            "Missing Nomination",
+                            "Duplicate UIN Records",
+                            "Total Contribution"
+                        ],
+                        "Value": [
+                            mini_row["BN"],
+                            mini_row["Total Employees"],
+                            mini_row["Pending"],
+                            mini_row["Completed"],
+                            mini_row["Missing PRAN"],
+                            mini_row["Missing Nomination"],
+                            mini_row["Duplicate UIN Records"],
+                            mini_row["Total Contribution"]
+                        ]
+                    })
+                else:
+                    mini = pd.DataFrame({
+                        "Particular": ["BN"],
+                        "Value": [bn_display]
+                    })
+
+                # Mini summary
+                mini.to_excel(
+                    writer,
+                    index=False,
+                    sheet_name=sheet_name,
+                    startrow=0
+                )
+
+                # Full BN data below summary
+                data_start_row = len(mini) + 3
 
                 group.to_excel(
                     writer,
                     index=False,
-                    sheet_name=sheet_name
+                    sheet_name=sheet_name,
+                    startrow=data_start_row - 1
                 )
 
-                format_excel_writer(
-                    writer,
-                    group,
+                ws = writer.book[
                     sheet_name
+                ]
+
+                # Format mini summary
+                format_excel_section(
+                    ws,
+                    header_row=1,
+                    start_row=2,
+                    end_row=len(mini) + 1,
+                    start_col=1,
+                    end_col=2
                 )
 
-        output.seek(0)
+                # Format full data
+                full_header_row = (
+                    data_start_row
+                )
+
+                full_end_row = (
+                    data_start_row
+                    + len(group)
+                )
+
+                format_excel_section(
+                    ws,
+                    header_row=full_header_row,
+                    start_row=full_header_row + 1,
+                    end_row=full_end_row,
+                    start_col=1,
+                    end_col=len(group.columns)
+                )
+
+                ws.freeze_panes = (
+                    f"A{full_header_row + 1}"
+                )
+
+        bn_output.seek(0)
 
         st.success(
             "BN-wise Complete Excel Report is ready."
@@ -2334,7 +1835,7 @@ if bn_col:
 
         st.download_button(
             "Download BN-wise Complete Excel Report",
-            data=output.getvalue(),
+            data=bn_output.getvalue(),
             file_name="BN_Wise_Complete_Report.xlsx",
             mime=(
                 "application/vnd.openxmlformats-officedocument."
@@ -2347,14 +1848,12 @@ if bn_col:
 # =========================================================
 # COMPLETE MASTER REPORT
 # =========================================================
-
 st.subheader(
     "Complete Master Report"
 )
 
 st.write(
-    "Generate all important reports "
-    "in a single Excel file."
+    "Generate all important reports in a single Excel file."
 )
 
 if st.button(
@@ -2362,19 +1861,18 @@ if st.button(
     key="generate_master_report"
 ):
 
-    output = BytesIO()
+    master_output = BytesIO()
 
     with pd.ExcelWriter(
-        output,
+        master_output,
         engine="openpyxl"
-    ) as writer:
+    ):
 
-        # ---------------- SUMMARY ----------------
-
+        # -------------------------------------------------
+        # Summary
+        # -------------------------------------------------
         summary_data = pd.DataFrame({
-
             "Particular": [
-
                 "Total Records",
                 "Pending",
                 "Completed",
@@ -2382,12 +1880,9 @@ if st.button(
                 "Unique Employees",
                 "Missing PRAN",
                 "Missing Nomination",
-                "Duplicate UIN Records",
-                "Unique Duplicate UINs"
+                "Duplicate UIN Records"
             ],
-
             "Value": [
-
                 total_records,
                 pending_count,
                 completed_count,
@@ -2395,8 +1890,7 @@ if st.button(
                 unique_employee_count,
                 len(missing_pran_report),
                 len(missing_nomination_report),
-                len(duplicate_uin_report),
-                duplicate_uin_unique_count
+                len(duplicate_uin_report)
             ]
         })
 
@@ -2412,11 +1906,10 @@ if st.button(
             "Summary"
         )
 
-
-        # ---------------- BN SUMMARY ----------------
-
+        # -------------------------------------------------
+        # BN Summary
+        # -------------------------------------------------
         if bn_col:
-
             bn_summary.to_excel(
                 writer,
                 index=False,
@@ -2429,9 +1922,9 @@ if st.button(
                 "BN Summary"
             )
 
-
-        # ---------------- EMPLOYEE MASTER ----------------
-
+        # -------------------------------------------------
+        # Employee Report
+        # -------------------------------------------------
         employee_report.to_excel(
             writer,
             index=False,
@@ -2444,10 +1937,21 @@ if st.button(
             "Employee Report"
         )
 
+        # -------------------------------------------------
+        # Missing PRAN
+        # -------------------------------------------------
+        if pran_col:
+            pran_export = (
+                missing_pran_report
+            )
+        else:
+            pran_export = pd.DataFrame({
+                "Message": [
+                    "PRAN column not found"
+                ]
+            })
 
-        # ---------------- MISSING PRAN ----------------
-
-        missing_pran_report.to_excel(
+        pran_export.to_excel(
             writer,
             index=False,
             sheet_name="Missing PRAN"
@@ -2455,14 +1959,25 @@ if st.button(
 
         format_excel_writer(
             writer,
-            missing_pran_report,
+            pran_export,
             "Missing PRAN"
         )
 
+        # -------------------------------------------------
+        # Missing Nomination
+        # -------------------------------------------------
+        if nomination_col:
+            nomination_export = (
+                missing_nomination_report
+            )
+        else:
+            nomination_export = pd.DataFrame({
+                "Message": [
+                    "Nomination column not found"
+                ]
+            })
 
-        # ---------------- MISSING NOMINATION ----------------
-
-        missing_nomination_report.to_excel(
+        nomination_export.to_excel(
             writer,
             index=False,
             sheet_name="Missing Nomination"
@@ -2470,14 +1985,25 @@ if st.button(
 
         format_excel_writer(
             writer,
-            missing_nomination_report,
+            nomination_export,
             "Missing Nomination"
         )
 
+        # -------------------------------------------------
+        # Duplicate UIN
+        # -------------------------------------------------
+        if uin_col:
+            duplicate_export = (
+                duplicate_uin_report
+            )
+        else:
+            duplicate_export = pd.DataFrame({
+                "Message": [
+                    "UIN column not found"
+                ]
+            })
 
-        # ---------------- DUPLICATE UIN ----------------
-
-        duplicate_uin_report.to_excel(
+        duplicate_export.to_excel(
             writer,
             index=False,
             sheet_name="Duplicate UIN"
@@ -2485,30 +2011,39 @@ if st.button(
 
         format_excel_writer(
             writer,
-            duplicate_uin_report,
+            duplicate_export,
             "Duplicate UIN"
         )
 
-
-        # ---------------- CASE STATUS ----------------
-
+        # -------------------------------------------------
+        # Case Status
+        # -------------------------------------------------
         if status_col:
-
-            status_summary.to_excel(
-                writer,
-                index=False,
-                sheet_name="Case Status"
+            status_export = (
+                status_summary
             )
+        else:
+            status_export = pd.DataFrame({
+                "Message": [
+                    "Status column not found"
+                ]
+            })
 
-            format_excel_writer(
-                writer,
-                status_summary,
-                "Case Status"
-            )
+        status_export.to_excel(
+            writer,
+            index=False,
+            sheet_name="Case Status"
+        )
 
+        format_excel_writer(
+            writer,
+            status_export,
+            "Case Status"
+        )
 
-        # ---------------- FILTERED RAW DATA ----------------
-
+        # -------------------------------------------------
+        # Filtered Data
+        # -------------------------------------------------
         filtered_df.to_excel(
             writer,
             index=False,
@@ -2521,23 +2056,7 @@ if st.button(
             "Filtered Data"
         )
 
-
-        # ---------------- UNIQUE MASTER ----------------
-
-        master_filtered_df.to_excel(
-            writer,
-            index=False,
-            sheet_name="Unique Employee Master"
-        )
-
-        format_excel_writer(
-            writer,
-            master_filtered_df,
-            "Unique Employee Master"
-        )
-
-
-    output.seek(0)
+    master_output.seek(0)
 
     st.success(
         "Complete Master Report is ready."
@@ -2545,7 +2064,7 @@ if st.button(
 
     st.download_button(
         "Download Complete Master Report",
-        data=output.getvalue(),
+        data=master_output.getvalue(),
         file_name="Complete_Master_Report.xlsx",
         mime=(
             "application/vnd.openxmlformats-officedocument."
@@ -2558,22 +2077,19 @@ if st.button(
 # =========================================================
 # DATA PREVIEW
 # =========================================================
-
-st.subheader(
-    "Data Preview"
-)
+st.subheader("Data Preview")
 
 st.dataframe(
     filtered_df,
     use_container_width=True,
-    height=450
+    height=450,
+    hide_index=True
 )
 
 
 # =========================================================
-# FILTERED DOWNLOAD
+# FILTERED EXCEL DOWNLOAD
 # =========================================================
-
 filtered_excel = make_excel(
     filtered_df,
     "Filtered Data"
