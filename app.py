@@ -20,39 +20,183 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .stApp { background: #f6f8fb; }
-    [data-testid="stHeader"] { background: transparent; }
+    /* =====================================================
+       PREMIUM LIGHT UI — HIGH CONTRAST / READABLE HEADINGS
+       ===================================================== */
+    .stApp {
+        background: linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
+        color: #17202a;
+    }
+
+    [data-testid="stHeader"] {
+        background: rgba(248, 250, 252, 0.92);
+    }
+
+    [data-testid="stAppViewContainer"] {
+        background: transparent;
+    }
+
+    /* Main application title */
     .main-title {
-        font-size: 38px;
-        font-weight: 800;
-        color: #12355b;
-        margin: 0 0 2px 0;
+        font-family: Arial, sans-serif;
+        font-size: 42px;
+        line-height: 1.12;
+        font-weight: 900;
+        letter-spacing: -0.8px;
+        color: #102f50 !important;
+        margin: 4px 0 4px 0;
+        text-shadow: 0 1px 0 #ffffff;
     }
+
     .sub-title {
-        color: #64748b;
-        font-size: 16px;
-        margin-bottom: 18px;
+        color: #52657a !important;
+        font-size: 17px;
+        font-weight: 500;
+        margin-bottom: 22px;
     }
-    .section-title {
-        color: #12355b;
-        font-weight: 750;
+
+    /* ALL Streamlit Markdown headings — fixes faint/white headings */
+    [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stMarkdownContainer"] h3,
+    [data-testid="stMarkdownContainer"] h4 {
+        color: #102f50 !important;
+        opacity: 1 !important;
+        font-weight: 850 !important;
+        letter-spacing: -0.25px;
     }
-    .info-card {
-        background: white;
-        border: 1px solid #dbe3ee;
+
+    /* Premium section headings such as Dashboard / BN Summary / Reports */
+    [data-testid="stMarkdownContainer"] h2 {
+        display: block;
+        background: linear-gradient(90deg, #e7f0fa 0%, #f8fbff 100%);
+        border: 1px solid #cbd9e8;
+        border-left: 6px solid #17365d;
         border-radius: 12px;
+        padding: 11px 16px 12px 16px;
+        margin: 26px 0 12px 0;
+        box-shadow: 0 5px 16px rgba(23, 54, 93, 0.08);
+    }
+
+    [data-testid="stMarkdownContainer"] h3 {
+        color: #17365d !important;
+        margin-top: 18px;
+    }
+
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] li,
+    [data-testid="stMarkdownContainer"] label {
+        color: #26384a !important;
+    }
+
+    /* Caption / helper text */
+    [data-testid="stCaptionContainer"] {
+        color: #5c6f82 !important;
+        opacity: 1 !important;
+    }
+
+    /* KPI cards */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(145deg, #ffffff 0%, #f4f8fc 100%);
+        border: 1px solid #cbd7e5;
+        border-radius: 16px;
+        padding: 15px 16px 13px 16px;
+        min-height: 112px;
+        box-shadow: 0 7px 20px rgba(15, 42, 67, 0.09);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    div[data-testid="stMetric"] label,
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: #52657a !important;
+        opacity: 1 !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+    }
+
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #102f50 !important;
+        opacity: 1 !important;
+        font-size: 29px !important;
+        font-weight: 850 !important;
+        line-height: 1.2 !important;
+    }
+
+    div[data-testid="stMetric"] [data-testid="stMetricDelta"] {
+        color: #52657a !important;
+    }
+
+    /* Success / information / warning boxes — readable premium contrast */
+    div[data-testid="stAlert"] {
+        border-radius: 14px !important;
+        border: 1px solid rgba(23, 54, 93, 0.14) !important;
+        box-shadow: 0 5px 16px rgba(15, 42, 67, 0.06) !important;
+    }
+
+    div[data-testid="stAlert"] p,
+    div[data-testid="stAlert"] span {
+        opacity: 1 !important;
+        font-weight: 600 !important;
+    }
+
+    /* Dataframes */
+    [data-testid="stDataFrame"] {
+        border: 1px solid #cbd7e5;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 5px 16px rgba(15, 42, 67, 0.06);
+        background: #ffffff;
+    }
+
+    /* Buttons */
+    .stButton > button,
+    .stDownloadButton > button {
+        border-radius: 10px !important;
+        border: 1px solid #17365d !important;
+        font-weight: 750 !important;
+        min-height: 42px;
+        box-shadow: 0 4px 10px rgba(23, 54, 93, 0.10);
+    }
+
+    .stButton > button:hover,
+    .stDownloadButton > button:hover {
+        border-color: #0f2945 !important;
+        box-shadow: 0 6px 14px rgba(23, 54, 93, 0.16);
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #f8fbff 0%, #eaf1f8 100%);
+        border-right: 1px solid #d3deea;
+    }
+
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] p {
+        color: #17365d !important;
+        opacity: 1 !important;
+    }
+
+    .section-title {
+        color: #17365d !important;
+        font-weight: 850;
+    }
+
+    .info-card {
+        background: linear-gradient(145deg, #ffffff, #f5f8fc);
+        border: 1px solid #cbd7e5;
+        border-radius: 14px;
         padding: 14px 16px;
         margin-bottom: 10px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        box-shadow: 0 5px 16px rgba(15, 42, 67, 0.06);
     }
-    div[data-testid="stMetric"] {
-        background: white;
-        border: 1px solid #dbe3ee;
-        border-radius: 12px;
-        padding: 12px 14px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+
+    .small-note {
+        color: #5c6f82 !important;
+        font-size: 13px;
     }
-    .small-note { color: #64748b; font-size: 13px; }
     </style>
     """,
     unsafe_allow_html=True,
