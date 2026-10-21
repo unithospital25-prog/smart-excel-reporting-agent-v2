@@ -48,6 +48,50 @@ st.markdown(
         text-shadow: 0 1px 0 #ffffff;
     }
 
+    /* Mobile-friendly upload area */
+    .upload-card {
+        background: linear-gradient(145deg, #ffffff 0%, #edf5ff 100%);
+        border: 1px solid #b9cde2;
+        border-left: 6px solid #17365d;
+        border-radius: 16px;
+        padding: 18px 20px 12px 20px;
+        margin: 10px 0 18px 0;
+        box-shadow: 0 8px 22px rgba(15, 42, 67, 0.08);
+    }
+
+    .upload-title {
+        color: #102f50 !important;
+        font-size: 22px;
+        font-weight: 850;
+        margin-bottom: 4px;
+    }
+
+    .upload-note {
+        color: #52657a !important;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    @media (max-width: 640px) {
+        .main-title {
+            font-size: 32px !important;
+            line-height: 1.12 !important;
+            letter-spacing: -0.5px !important;
+        }
+        .sub-title {
+            font-size: 14px !important;
+            line-height: 1.45 !important;
+            margin-bottom: 14px !important;
+        }
+        .upload-card {
+            padding: 14px 14px 10px 14px !important;
+            border-left-width: 4px !important;
+        }
+        .upload-title {
+            font-size: 19px !important;
+        }
+    }
+
     .sub-title {
         color: #52657a !important;
         font-size: 17px;
@@ -538,21 +582,36 @@ def make_simple_excel(df, sheet_name="Report", title=None):
     return output.getvalue()
 
 # =========================================================
-# UPLOAD
+# MAIN-SCREEN UPLOAD — MOBILE FRIENDLY
 # =========================================================
-with st.sidebar:
-    st.markdown("### 📁 Data Input")
-    uploaded_files = st.file_uploader(
-        "Upload Excel file(s)",
-        type=["xlsx", "xls"],
-        accept_multiple_files=True,
-        help="Multiple Excel files and all worksheets are supported.",
-    )
-    st.caption("Up to 500 MB per file • XLSX / XLS")
+st.markdown(
+    """
+    <div class="upload-card">
+        <div class="upload-title">📁 Upload Excel Files</div>
+        <div class="upload-note">Upload one or more Excel files. All worksheets will be consolidated automatically.</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+uploaded_files = st.file_uploader(
+    "Choose Excel file(s)",
+    type=["xlsx", "xls"],
+    accept_multiple_files=True,
+    help="Multiple Excel files and all worksheets are supported.",
+    key="main_excel_uploader",
+)
+st.caption("Up to 500 MB per file • XLSX / XLS • Multiple files supported")
 
 if not uploaded_files:
-    st.info("👆 Upload one or more Excel files from the sidebar to start.")
+    st.info("👆 Please choose one or more Excel files above to start the Dashboard and Reports.")
     st.stop()
+
+# Filters remain in the sidebar after files are uploaded.
+with st.sidebar:
+    st.markdown("### 📁 Data Input")
+    st.success(f"{len(uploaded_files)} file(s) selected")
+    st.caption("Upload control is available on the main screen for easy mobile access.")
 
 # =========================================================
 # READ ALL FILES / SHEETS
