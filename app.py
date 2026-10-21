@@ -248,6 +248,71 @@ st.markdown(
         opacity: 0.82 !important;
     }
 
+    /* =====================================================
+       PREMIUM EXCEL UPLOAD CONTROL
+       Navy + Gold + White — high contrast on mobile
+       ===================================================== */
+    [data-testid="stFileUploader"] {
+        margin-top: -6px !important;
+    }
+
+    [data-testid="stFileUploader"] label,
+    [data-testid="stFileUploader"] label p {
+        color: #17365d !important;
+        -webkit-text-fill-color: #17365d !important;
+        font-weight: 800 !important;
+        opacity: 1 !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] {
+        background: linear-gradient(135deg, #17365d 0%, #102f50 72%, #0b223b 100%) !important;
+        border: 2px dashed #d4af37 !important;
+        border-radius: 14px !important;
+        box-shadow: 0 6px 18px rgba(15, 42, 67, 0.20), inset 0 1px 0 rgba(255,255,255,0.10) !important;
+        padding: 14px !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] * {
+        color: #ffffff !important;
+        -webkit-text-fill-color: #ffffff !important;
+        opacity: 1 !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] button {
+        background: linear-gradient(135deg, #d4af37 0%, #b88a00 100%) !important;
+        color: #102f50 !important;
+        -webkit-text-fill-color: #102f50 !important;
+        border: 1px solid #f1d36b !important;
+        border-radius: 10px !important;
+        font-weight: 900 !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.18) !important;
+    }
+
+    [data-testid="stFileUploaderDropzone"] button * {
+        color: #102f50 !important;
+        -webkit-text-fill-color: #102f50 !important;
+        font-weight: 900 !important;
+    }
+
+    [data-testid="stFileUploaderFileData"] {
+        color: #17365d !important;
+        opacity: 1 !important;
+        font-weight: 700 !important;
+    }
+
+    /* Uploaded file chips/cards */
+    [data-testid="stFileUploaderFile"] {
+        background: linear-gradient(135deg, #ffffff 0%, #eef4fb 100%) !important;
+        border: 1px solid #d4af37 !important;
+        border-radius: 10px !important;
+    }
+
+    [data-testid="stFileUploaderFile"] * {
+        color: #17365d !important;
+        -webkit-text-fill-color: #17365d !important;
+        opacity: 1 !important;
+    }
+
     /* Sidebar */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #f8fbff 0%, #eaf1f8 100%);
@@ -641,7 +706,7 @@ st.markdown(
 )
 
 uploaded_files = st.file_uploader(
-    "Choose Excel file(s)",
+    "📂 Choose Excel File(s)",
     type=["xlsx", "xls"],
     accept_multiple_files=True,
     help="Multiple Excel files and all worksheets are supported.",
