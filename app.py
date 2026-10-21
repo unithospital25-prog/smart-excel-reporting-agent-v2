@@ -9,7 +9,7 @@ import streamlit as st
 # =========================================================
 st.set_page_config(
     page_title="Smart Excel Reporting Agent",
-    page_icon="ðŸ“Š",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -58,7 +58,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="main-title">ðŸ“Š Smart Excel Reporting Agent</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">📊 Smart Excel Reporting Agent</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="sub-title">Professional multi-file Excel consolidation, validation and reporting system</div>',
     unsafe_allow_html=True,
@@ -274,9 +274,9 @@ def completion_pct(done_or_missing, total, mode="missing"):
 
 def money(v):
     try:
-        return f"â‚¹{float(v):,.2f}"
+        return f"₹{float(v):,.2f}"
     except Exception:
-        return "â‚¹0.00"
+        return "₹0.00"
 
 # =========================================================
 # EXCEL FORMATTING ENGINE
@@ -397,17 +397,17 @@ def make_simple_excel(df, sheet_name="Report", title=None):
 # UPLOAD
 # =========================================================
 with st.sidebar:
-    st.markdown("### ðŸ“ Data Input")
+    st.markdown("### 📁 Data Input")
     uploaded_files = st.file_uploader(
         "Upload Excel file(s)",
         type=["xlsx", "xls"],
         accept_multiple_files=True,
         help="Multiple Excel files and all worksheets are supported.",
     )
-    st.caption("Up to 500 MB per file â€¢ XLSX / XLS")
+    st.caption("Up to 500 MB per file • XLSX / XLS")
 
 if not uploaded_files:
-    st.info("ðŸ‘† Upload one or more Excel files from the sidebar to start.")
+    st.info("👆 Upload one or more Excel files from the sidebar to start.")
     st.stop()
 
 # =========================================================
@@ -438,7 +438,7 @@ for file in uploaded_files:
         errors.append(f"{file.name}: {exc}")
 
 if errors:
-    with st.expander("âš ï¸ File reading warnings"):
+    with st.expander("⚠️ File reading warnings"):
         for error in errors:
             st.warning(error)
 
@@ -466,7 +466,7 @@ amount_col = find_col(master_df.columns, ["Contribution", "Amount", "Total Amoun
 # =========================================================
 # FILTERS
 # =========================================================
-st.sidebar.markdown("### ðŸ”Ž Filters")
+st.sidebar.markdown("### 🔎 Filters")
 search_text = st.sidebar.text_input("Search UIN / Name / BN / PRAN / Mobile / Status")
 
 filtered_df = master_df.copy()
@@ -513,19 +513,19 @@ nomination_completion = completion_pct(len(missing_nom_df), unique_employees)
 # TOP STATUS BAR
 # =========================================================
 st.success(
-    f"Loaded {len(uploaded_files)} file(s) â€¢ {len(source_log)} worksheet(s) â€¢ "
+    f"Loaded {len(uploaded_files)} file(s) • {len(source_log)} worksheet(s) • "
     f"{len(master_df):,} unique business records"
 )
 if removed_duplicate_records:
-    st.info(f"â™»ï¸ {removed_duplicate_records:,} exact duplicate record(s) were removed automatically. Source File/Source Sheet were ignored during duplicate comparison.")
+    st.info(f"♻️ {removed_duplicate_records:,} exact duplicate record(s) were removed automatically. Source File/Source Sheet were ignored during duplicate comparison.")
 
-with st.expander("ðŸ“ Uploaded Files Summary"):
+with st.expander("📁 Uploaded Files Summary"):
     st.dataframe(pd.DataFrame(source_log), use_container_width=True, hide_index=True)
 
 # =========================================================
 # DASHBOARD
 # =========================================================
-st.markdown("## ðŸ“ˆ Automatic Dashboard")
+st.markdown("## 📈 Automatic Dashboard")
 st.caption("Employee-level KPIs use one consolidated row per employee. Contribution uses the cleaned transaction/history records.")
 
 r1 = st.columns(5)
@@ -547,7 +547,7 @@ r2[4].metric("Total Contribution", money(total_contribution))
 # =========================================================
 bn_summary = pd.DataFrame()
 if bn_col:
-    st.markdown("## ðŸ¢ BN-wise Summary")
+    st.markdown("## 🏢 BN-wise Summary")
     rows = []
     for bn_value, emp_group in employee_df.groupby(bn_col, dropna=False, sort=True):
         display_bn = str(bn_value).strip() if not pd.isna(bn_value) else ""
@@ -577,7 +577,7 @@ if bn_col:
 # CASE STATUS
 # =========================================================
 if status_col:
-    st.markdown("## ðŸ“Œ Case Status Summary")
+    st.markdown("## 📌 Case Status Summary")
     status_summary = filtered_df[status_col].fillna("Blank").astype(str).str.strip().replace("", "Blank").value_counts().rename_axis("Case Status").reset_index(name="Total")
     st.dataframe(status_summary, use_container_width=True, hide_index=True)
 else:
@@ -586,34 +586,34 @@ else:
 # =========================================================
 # INDIVIDUAL REPORTS
 # =========================================================
-st.markdown("## ðŸ‘¤ Employee-wise Report")
+st.markdown("## 👤 Employee-wise Report")
 st.write(f"**Total Unique Employees: {unique_employees:,}**")
 st.dataframe(employee_df, use_container_width=True, hide_index=True, height=420)
-st.download_button("â¬‡ï¸ Download Employee-wise Excel", make_simple_excel(employee_df, "Employee Report", "Employee-wise Master Report"), "Employee_Wise_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="employee_download")
+st.download_button("⬇️ Download Employee-wise Excel", make_simple_excel(employee_df, "Employee Report", "Employee-wise Master Report"), "Employee_Wise_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="employee_download")
 
-st.markdown("## âš ï¸ Duplicate UIN Report")
+st.markdown("## ⚠️ Duplicate UIN Report")
 if duplicate_uin_df.empty:
-    st.success("âœ… No conflicting duplicate UIN found.")
+    st.success("✅ No conflicting duplicate UIN found.")
 else:
     st.warning(f"{len(duplicate_uin_df):,} record(s) require UIN verification.")
     st.dataframe(duplicate_uin_df, use_container_width=True, hide_index=True)
-    st.download_button("â¬‡ï¸ Download Duplicate UIN Report", make_simple_excel(duplicate_uin_df, "Duplicate UIN", "Duplicate / Conflicting UIN Report"), "Duplicate_UIN_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dup_download")
+    st.download_button("⬇️ Download Duplicate UIN Report", make_simple_excel(duplicate_uin_df, "Duplicate UIN", "Duplicate / Conflicting UIN Report"), "Duplicate_UIN_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dup_download")
 
-st.markdown("## ðŸªª Missing PRAN Report")
+st.markdown("## 🪪 Missing PRAN Report")
 if missing_pran_df.empty:
-    st.success("âœ… All employees have PRAN.")
+    st.success("✅ All employees have PRAN.")
 else:
     st.warning(f"Employees without PRAN: {len(missing_pran_df):,}")
     st.dataframe(missing_pran_df, use_container_width=True, hide_index=True)
-    st.download_button("â¬‡ï¸ Download Missing PRAN Report", make_simple_excel(missing_pran_df, "Missing PRAN", "Employees Without PRAN"), "Missing_PRAN_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="pran_download")
+    st.download_button("⬇️ Download Missing PRAN Report", make_simple_excel(missing_pran_df, "Missing PRAN", "Employees Without PRAN"), "Missing_PRAN_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="pran_download")
 
-st.markdown("## ðŸ“ Missing Nomination Report")
+st.markdown("## 📝 Missing Nomination Report")
 if missing_nom_df.empty:
-    st.success("âœ… All employees have nomination.")
+    st.success("✅ All employees have nomination.")
 else:
     st.warning(f"Employees with missing nomination: {len(missing_nom_df):,}")
     st.dataframe(missing_nom_df, use_container_width=True, hide_index=True)
-    st.download_button("â¬‡ï¸ Download Missing Nomination Report", make_simple_excel(missing_nom_df, "Missing Nomination", "Employees With Missing Nomination"), "Missing_Nomination_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="nom_download")
+    st.download_button("⬇️ Download Missing Nomination Report", make_simple_excel(missing_nom_df, "Missing Nomination", "Employees With Missing Nomination"), "Missing_Nomination_Report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="nom_download")
 
 # =========================================================
 # EXCEL REPORT BUILDERS
@@ -711,13 +711,13 @@ def build_complete_report(include_bn_sheets=False):
 # =========================================================
 # DOWNLOAD CENTRE
 # =========================================================
-st.markdown("## ðŸ“¦ Excel Report Centre")
+st.markdown("## 📦 Excel Report Centre")
 st.caption("All reports are formatted with professional headers, borders, filters, freeze panes, automatic widths, print settings and Excel table styling.")
 
 c1, c2 = st.columns(2)
 with c1:
     st.download_button(
-        "â¬‡ï¸ Download Complete Master Report",
+        "⬇️ Download Complete Master Report",
         build_complete_report(False),
         "Complete_Master_Report.xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -726,7 +726,7 @@ with c1:
     )
 with c2:
     st.download_button(
-        "â¬‡ï¸ Download BN-wise Complete Report",
+        "⬇️ Download BN-wise Complete Report",
         build_complete_report(True),
         "BN_Wise_Complete_Report.xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -735,7 +735,7 @@ with c2:
     )
 
 st.download_button(
-    "â¬‡ï¸ Download Cleaned Filtered Excel",
+    "⬇️ Download Cleaned Filtered Excel",
     make_simple_excel(filtered_df, "Filtered Data", "Cleaned Filtered Data"),
     "Filtered_Report.xlsx",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -746,10 +746,10 @@ st.download_button(
 # =========================================================
 # PREVIEW
 # =========================================================
-st.markdown("## ðŸ‘€ Data Preview")
+st.markdown("## 👀 Data Preview")
 st.dataframe(filtered_df, use_container_width=True, height=450, hide_index=True)
 
-with st.expander("â„¹ï¸ Detected Columns"):
+with st.expander("ℹ️ Detected Columns"):
     st.write({
         "UIN": uin_col,
         "Employee Name": name_col,
